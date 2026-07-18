@@ -1,0 +1,98 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    function hasTopMembership(orgId) {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/organizationMembers/$(orgId + '_' + uid()))
+        && firestore.get(/databases/(default)/documents/organizationMembers/$(orgId + '_' + uid())).data.status == 'active';
+    }
+
+    function hasLegacyMembership(orgId) {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/orgs/$(orgId)/members/$(uid()))
+        && firestore.get(/databases/(default)/documents/orgs/$(orgId)/members/$(uid())).data.status == 'active';
+    }
+
+    function memberRole(orgId) {
+      return hasTopMembership(orgId)
+        ? firestore.get(/databases/(default)/documents/organizationMembers/$(orgId + '_' + uid())).data.role
+        : (
+            hasLegacyMembership(orgId)
+              ? firestore.get(/databases/(default)/documents/orgs/$(orgId)/members/$(uid())).data.role
+              : null
+          );
+    }
+
+    function isOrgAdmin(orgId) {
+      return memberRole(orgId) in ['super_admin', 'agency_admin', 'property_manager', 'broker', 'admin', 'manager'];
+    }
+
+    function memberHasProperty(orgId, propertyId) {
+      return hasTopMembership(orgId)
+        && firestore.get(/databases/(default)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds.hasAny([propertyId]);
+    }
+
+    function canReadProperty(orgId, propertyId) {
+      return isOrgAdmin(orgId) || memberHasProperty(orgId, propertyId);
+    }
+
+    // Backward-compatible assets
+    match /orgs/{orgId}/inspections/{inspectionId}/findings/{findingId}/{fileName} {
+      allow read: if hasTopMembership(orgId) || hasLegacyMembership(orgId);
+      allow write: if hasTopMembership(orgId) || hasLegacyMembership(orgId);
+    }
+
+    match /orgs/{orgId}/inspections/{inspectionId}/signatures/{fileName} {
+      allow read: if hasTopMembership(orgId) || hasLegacyMembership(orgId);
+      allow write: if hasTopMembership(orgId) || hasLegacyMembership(orgId);
+    }
+
+    match /orgs/{orgId}/branding/{fileName} {
+      allow read: if hasTopMembership(orgId) || hasLegacyMembership(orgId);
+      allow write: if isOrgAdmin(orgId);
+    }
+
+    match /orgs/{orgId}/reports/{reportId}/{fileName} {
+      allow read: if hasTopMembership(orgId) || hasLegacyMembership(orgId);
+      allow write: if false;
+    }
+
+    // Tenant-scoped uploads
+    match /orgs/{orgId}/tenant-uploads/{propertyId}/{unitId}/{tenantUid}/{fileName} {
+      allow read: if canReadProperty(orgId, propertyId)
+        || (signedIn() && uid() == tenantUid);
+      allow write: if (signedIn() && uid() == tenantUid)
+        || isOrgAdmin(orgId);
+    }
+
+    // Property-scoped documents
+    match /orgs/{orgId}/documents/{propertyId}/{unitId}/{fileName} {
+      allow read: if canReadProperty(orgId, propertyId);
+      allow write: if isOrgAdmin(orgId)
+        || (memberRole(orgId) == 'tenant' && memberHasProperty(orgId, propertyId));
+    }
+
+    // Payment proofs by tenant
+    match /orgs/{orgId}/payments/{propertyId}/{tenantUid}/{fileName} {
+      allow read: if canReadProperty(orgId, propertyId)
+        || (signedIn() && uid() == tenantUid);
+      allow write: if (signedIn() && uid() == tenantUid)
+        || isOrgAdmin(orgId);
+    }
+
+    // Maintenance attachments (tenant/vendor/staff/admin)
+    match /orgs/{orgId}/maintenance/{propertyId}/{requestId}/{fileName} {
+      allow read: if canReadProperty(orgId, propertyId);
+      allow write: if canReadProperty(orgId, propertyId)
+        && memberRole(orgId) in ['tenant', 'vendor', 'maintenance', 'staff', 'admin', 'manager', 'property_manager', 'agency_admin', 'super_admin'];
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

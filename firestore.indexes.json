@@ -1,0 +1,493 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "propertyAssignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "propertyAssignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "propertyAssignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizationMembers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizationMembers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizationMembers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invitations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invitations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invitations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "email", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "properties",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "units",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "units",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tenants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "currentPropertyId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tenants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "currentPropertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+
+    {
+      "collectionGroup": "agents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "landlords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vendors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leases",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "unitId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "leaseId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "landlordId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "documents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "documents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "documents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "relatedEntityType", "order": "ASCENDING" },
+        { "fieldPath": "relatedEntityId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantUid", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "maintenanceRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "assignedVendorId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inspections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "findings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "severity", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "clients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientType", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "listings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "listingStatus", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "listings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "listingStatus", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "showings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "scheduledAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "showings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "scheduledAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "offers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "offers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "propertyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "transactionId", "order": "ASCENDING" },
+        { "fieldPath": "paymentStatus", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paymentStatus", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

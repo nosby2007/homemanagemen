@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "outDir": "../.tmp-tests",
+    "rootDir": "..",
+    "types": ["node"],
+    "lib": ["ES2022"],
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "../src/app/core/utils/property-scope.ts",
+    "./architecture/property-scope.test.ts"
+  ]
+}

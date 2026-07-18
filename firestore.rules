@@ -1,0 +1,662 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    function isSuperAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid()))
+        && (
+          get(/databases/$(database)/documents/users/$(uid())).data.role in ['super_admin', 'superadmin']
+          || get(/databases/$(database)/documents/users/$(uid())).data.globalRole == 'superadmin'
+        );
+    }
+
+    function hasTopMembership(orgId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid()))
+        && get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.status == 'active';
+    }
+
+    function hasLegacyMembership(orgId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid()))
+        && get(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid())).data.status == 'active';
+    }
+
+    function isOrgMember(orgId) {
+      return isSuperAdmin() || hasTopMembership(orgId) || hasLegacyMembership(orgId);
+    }
+
+    function memberRole(orgId) {
+      return hasTopMembership(orgId)
+        ? get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.role
+        : (
+            hasLegacyMembership(orgId)
+              ? get(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid())).data.role
+              : null
+          );
+    }
+
+    function isOrgAdmin(orgId) {
+      return isSuperAdmin() || (
+        isOrgMember(orgId)
+        && memberRole(orgId) in ['super_admin', 'agency_admin', 'property_manager', 'admin', 'manager', 'broker']
+      );
+    }
+
+    function memberHasProperty(orgId, propertyId) {
+      return isOrgAdmin(orgId)
+        || (
+          hasTopMembership(orgId)
+          && (
+            get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.defaultPropertyId == propertyId
+            || (
+              get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds is list
+              && get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds.hasAny([propertyId])
+            )
+          )
+        )
+        || (
+          hasLegacyMembership(orgId)
+          && (
+            get(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid())).data.defaultPropertyId == propertyId
+            || (
+              get(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid())).data.propertyIds is list
+              && get(/databases/$(database)/documents/orgs/$(orgId)/members/$(uid())).data.propertyIds.hasAny([propertyId])
+            )
+          )
+        );
+    }
+
+    function canReadProperty(orgId, propertyId) {
+      return memberHasProperty(orgId, propertyId);
+    }
+
+    function hasNonEmptyString(data, field) {
+      return data[field] is string && data[field] != '';
+    }
+
+    function hasPropertyListScope(data) {
+      return data.propertyIds is list
+        && data.propertyIds.size() > 0
+        && data.defaultPropertyId is string
+        && data.defaultPropertyId != ''
+        && data.propertyIds.hasAny([data.defaultPropertyId]);
+    }
+
+    function isSelfProfile(resourceData) {
+      return signedIn() && (
+        resourceData.userId == uid()
+        || resourceData.userUid == uid() // Legacy compatibility
+      );
+    }
+
+    function canReadDocument(resourceData) {
+      return isOrgAdmin(resourceData.orgId)
+        || (
+          resourceData.propertyId is string
+          && canReadProperty(resourceData.orgId, resourceData.propertyId)
+        )
+        || (
+          resourceData.tenantId is string
+          && exists(/databases/$(database)/documents/orgs/$(resourceData.orgId)/tenants/$(resourceData.tenantId))
+          && isSelfProfile(get(/databases/$(database)/documents/orgs/$(resourceData.orgId)/tenants/$(resourceData.tenantId)).data)
+        )
+        || (
+          resourceData.visibility in ['tenant']
+          && resourceData.tenantId is string
+          && exists(/databases/$(database)/documents/orgs/$(resourceData.orgId)/tenants/$(resourceData.tenantId))
+          && isSelfProfile(get(/databases/$(database)/documents/orgs/$(resourceData.orgId)/tenants/$(resourceData.tenantId)).data)
+        )
+        || (
+          resourceData.visibility in ['landlord', 'property_manager', 'property_team', 'internal', 'org', 'admin', 'private']
+          && resourceData.propertyId is string
+          && canReadProperty(resourceData.orgId, resourceData.propertyId)
+        );
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (uid() == userId || isSuperAdmin());
+      allow create: if signedIn() && uid() == userId;
+      allow update: if isSuperAdmin()
+        || (
+          signedIn() && uid() == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.globalRole == resource.data.globalRole
+        );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /organizationMembers/{membershipId} {
+      allow read: if signedIn() && (resource.data.userId == uid() || isOrgAdmin(resource.data.orgId));
+      allow create, update, delete: if false;
+    }
+
+    match /propertyAssignments/{assignmentId} {
+      allow read: if signedIn() && (resource.data.userId == uid() || isOrgAdmin(resource.data.orgId));
+      allow create, update, delete: if false;
+    }
+
+    match /invitations/{invitationId} {
+      allow read: if signedIn() && (
+        isOrgAdmin(resource.data.orgId)
+        || resource.data.invitedBy == uid()
+      );
+      // Invitation creation/acceptance must stay in Cloud Functions (Admin SDK)
+      allow create, update, delete: if false;
+    }
+
+    match /organizations/{orgId} {
+      allow read: if isSuperAdmin() || isOrgMember(orgId);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /orgs/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if isOrgAdmin(orgId);
+
+      match /members/{memberId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId);
+      }
+
+      match /properties/{propertyId} {
+        allow read: if canReadProperty(orgId, propertyId);
+        allow create, update, delete: if isOrgAdmin(orgId);
+
+        match /leases/{leaseId} {
+          allow read: if canReadProperty(orgId, propertyId)
+            || (
+              resource.data.tenantId is string
+              && exists(/databases/$(database)/documents/orgs/$(orgId)/tenants/$(resource.data.tenantId))
+              && isSelfProfile(get(/databases/$(database)/documents/orgs/$(orgId)/tenants/$(resource.data.tenantId)).data)
+            );
+          allow create: if (
+              isOrgAdmin(orgId) || (
+                memberRole(orgId) in ['landlord', 'property_manager', 'manager']
+                && canReadProperty(orgId, propertyId)
+              )
+            )
+            && request.resource.data.orgId == orgId
+            && request.resource.data.propertyId == propertyId
+            && hasNonEmptyString(request.resource.data, 'tenantId')
+            && hasNonEmptyString(request.resource.data, 'unitId');
+
+          allow update, delete: if isOrgAdmin(orgId) || (
+            memberRole(orgId) in ['landlord', 'property_manager', 'manager']
+            && canReadProperty(orgId, propertyId)
+          );
+
+          match /payments/{paymentId} {
+            allow read: if canReadProperty(orgId, propertyId)
+              || resource.data.tenantUid == uid()
+              || resource.data.tenantUserId == uid();
+
+            allow create: if (
+                isOrgAdmin(orgId)
+                && request.resource.data.orgId == orgId
+                && request.resource.data.propertyId == propertyId
+                && request.resource.data.leaseId == leaseId
+                && hasNonEmptyString(request.resource.data, 'tenantId')
+                && hasNonEmptyString(request.resource.data, 'unitId')
+              )
+              || (
+                request.resource.data.tenantUid == uid()
+                && request.resource.data.orgId == orgId
+                && request.resource.data.propertyId == propertyId
+                && request.resource.data.leaseId == leaseId
+                && hasNonEmptyString(request.resource.data, 'tenantId')
+                && hasNonEmptyString(request.resource.data, 'unitId')
+                && request.resource.data.status in ['new', 'pending']
+                && !('paidAt' in request.resource.data)
+                && !('verifiedBy' in request.resource.data)
+                && !('verifiedAt' in request.resource.data)
+              );
+
+            allow update: if isOrgAdmin(orgId)
+              || (
+                resource.data.tenantUid == uid()
+                && request.resource.data.tenantUid == resource.data.tenantUid
+                && request.resource.data.status in ['new', 'pending']
+                && !('paidAt' in request.resource.data)
+                && !('verifiedBy' in request.resource.data)
+                && !('verifiedAt' in request.resource.data)
+              );
+
+            allow delete: if isOrgAdmin(orgId);
+          }
+        }
+
+        match /inspections/{inspectionId} {
+          allow read: if canReadProperty(orgId, propertyId);
+          allow create: if (
+              isOrgAdmin(orgId)
+              || (
+                memberRole(orgId) in ['property_manager', 'manager', 'landlord']
+                && canReadProperty(orgId, propertyId)
+              )
+            )
+            && request.resource.data.orgId == orgId
+            && request.resource.data.propertyId == propertyId;
+
+          allow update, delete: if isOrgAdmin(orgId)
+            || (
+              memberRole(orgId) in ['property_manager', 'manager', 'landlord']
+              && canReadProperty(orgId, propertyId)
+            );
+
+          match /findings/{findingId} {
+            allow read: if canReadProperty(orgId, propertyId);
+            allow create, update, delete: if isOrgAdmin(orgId)
+              || (
+                memberRole(orgId) in ['property_manager', 'manager', 'landlord']
+                && canReadProperty(orgId, propertyId)
+              );
+          }
+        }
+      }
+
+      match /units/{unitId} {
+        allow read: if isOrgAdmin(orgId)
+          || (
+            resource.data.propertyId is string
+            && canReadProperty(orgId, resource.data.propertyId)
+          );
+        allow create, update, delete: if isOrgAdmin(orgId)
+          || (
+            memberRole(orgId) in ['property_manager', 'manager']
+            && resource.data.propertyId is string
+            && canReadProperty(orgId, resource.data.propertyId)
+          );
+      }
+
+      match /tenants/{tenantId} {
+        allow read: if isOrgAdmin(orgId)
+          || isSelfProfile(resource.data)
+          || (
+            resource.data.currentPropertyId is string
+            && canReadProperty(orgId, resource.data.currentPropertyId)
+          );
+
+        allow create: if isOrgAdmin(orgId)
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'currentPropertyId')
+          && hasNonEmptyString(request.resource.data, 'currentUnitId')
+          && request.resource.data.currentPropertyId == request.resource.data.primaryPropertyId
+          && request.resource.data.currentUnitId == request.resource.data.primaryUnitId;
+
+        allow update: if (
+            isOrgAdmin(orgId)
+            && request.resource.data.userId == resource.data.userId
+            && request.resource.data.userUid == resource.data.userUid
+            && !(request.resource.data.authStatus == 'active' && resource.data.authStatus != 'active')
+          ) || (
+            isSelfProfile(resource.data)
+            && request.resource.data.userId == resource.data.userId
+            && request.resource.data.userUid == resource.data.userUid
+            && request.resource.data.authStatus == resource.data.authStatus
+            && request.resource.data.role == resource.data.role
+          );
+
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /landlords/{landlordId} {
+        allow read: if isOrgAdmin(orgId)
+          || isSelfProfile(resource.data)
+          || (
+            resource.data.propertyIds is list
+            && (
+              resource.data.propertyIds.hasAny(
+                hasTopMembership(orgId)
+                  ? get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds
+                  : []
+              )
+            )
+          );
+        allow create: if isOrgAdmin(orgId)
+          && request.resource.data.orgId == orgId
+          && hasPropertyListScope(request.resource.data);
+        allow update: if isOrgAdmin(orgId)
+          && request.resource.data.userId == resource.data.userId
+          && !(request.resource.data.authStatus == 'active' && resource.data.authStatus != 'active');
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /agents/{agentId} {
+        allow read: if isOrgAdmin(orgId)
+          || isSelfProfile(resource.data)
+          || (
+            resource.data.propertyIds is list
+            && hasTopMembership(orgId)
+            && get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds is list
+            && resource.data.propertyIds.hasAny(get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds)
+          );
+        allow create: if isOrgAdmin(orgId)
+          && request.resource.data.orgId == orgId
+          && hasPropertyListScope(request.resource.data);
+        allow update: if isOrgAdmin(orgId)
+          && request.resource.data.userId == resource.data.userId
+          && !(request.resource.data.authStatus == 'active' && resource.data.authStatus != 'active');
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /clients/{clientId} {
+        allow read: if isOrgAdmin(orgId)
+          || isSelfProfile(resource.data)
+          || (
+            resource.data.propertyId is string
+            && canReadProperty(orgId, resource.data.propertyId)
+          )
+          || (
+            resource.data.assignedAgentId is string
+            && resource.data.assignedAgentId == uid()
+          );
+
+        allow create: if (
+            isOrgAdmin(orgId)
+            || memberRole(orgId) in ['agent', 'broker', 'manager']
+          )
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'fullName')
+          && hasNonEmptyString(request.resource.data, 'propertyId');
+
+        allow update: if isOrgAdmin(orgId)
+          || (
+            resource.data.assignedAgentId is string
+            && resource.data.assignedAgentId == uid()
+          );
+
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /vendors/{vendorId} {
+        allow read: if isOrgAdmin(orgId)
+          || isSelfProfile(resource.data)
+          || (
+            resource.data.propertyIds is list
+            && hasTopMembership(orgId)
+            && get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds is list
+            && resource.data.propertyIds.hasAny(get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds)
+          );
+        allow create: if isOrgAdmin(orgId)
+          && request.resource.data.orgId == orgId
+          && hasPropertyListScope(request.resource.data);
+        allow update: if isOrgAdmin(orgId)
+          && request.resource.data.userId == resource.data.userId
+          && !(request.resource.data.authStatus == 'active' && resource.data.authStatus != 'active');
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /staff/{staffId} {
+        allow read: if isOrgAdmin(orgId)
+          || isSelfProfile(resource.data)
+          || (
+            resource.data.propertyIds is list
+            && hasTopMembership(orgId)
+            && get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds is list
+            && resource.data.propertyIds.hasAny(get(/databases/$(database)/documents/organizationMembers/$(orgId + '_' + uid())).data.propertyIds)
+          );
+        allow create: if isOrgAdmin(orgId)
+          && request.resource.data.orgId == orgId
+          && hasPropertyListScope(request.resource.data);
+        allow update: if isOrgAdmin(orgId)
+          && request.resource.data.userId == resource.data.userId
+          && !(request.resource.data.authStatus == 'active' && resource.data.authStatus != 'active');
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /listings/{listingId} {
+        allow read: if resource.data.propertyId is string
+          && canReadProperty(orgId, resource.data.propertyId);
+        allow create: if (
+            isOrgAdmin(orgId)
+            || (
+              memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+              && canReadProperty(orgId, request.resource.data.propertyId)
+            )
+          )
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'propertyId');
+        allow update, delete: if isOrgAdmin(orgId)
+          || (
+            resource.data.propertyId is string
+            && memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+            && canReadProperty(orgId, resource.data.propertyId)
+          );
+      }
+
+      match /showings/{showingId} {
+        allow read: if resource.data.propertyId is string
+          && canReadProperty(orgId, resource.data.propertyId);
+        allow create: if (
+            isOrgAdmin(orgId)
+            || (
+              memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+              && canReadProperty(orgId, request.resource.data.propertyId)
+            )
+          )
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'propertyId')
+          && hasNonEmptyString(request.resource.data, 'listingId')
+          && hasNonEmptyString(request.resource.data, 'clientId');
+        allow update, delete: if isOrgAdmin(orgId)
+          || (
+            resource.data.propertyId is string
+            && memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+            && canReadProperty(orgId, resource.data.propertyId)
+          );
+      }
+
+      match /offers/{offerId} {
+        allow read: if resource.data.propertyId is string
+          && canReadProperty(orgId, resource.data.propertyId);
+        allow create: if (
+            isOrgAdmin(orgId)
+            || (
+              memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+              && canReadProperty(orgId, request.resource.data.propertyId)
+            )
+          )
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'propertyId')
+          && hasNonEmptyString(request.resource.data, 'listingId')
+          && hasNonEmptyString(request.resource.data, 'buyerId');
+        allow update, delete: if isOrgAdmin(orgId)
+          || (
+            resource.data.propertyId is string
+            && memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+            && canReadProperty(orgId, resource.data.propertyId)
+          );
+      }
+
+      match /transactions/{transactionId} {
+        allow read: if resource.data.propertyId is string
+          && canReadProperty(orgId, resource.data.propertyId);
+        allow create: if (
+            isOrgAdmin(orgId)
+            || (
+              memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+              && canReadProperty(orgId, request.resource.data.propertyId)
+            )
+          )
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'propertyId');
+        allow update, delete: if isOrgAdmin(orgId)
+          || (
+            resource.data.propertyId is string
+            && memberRole(orgId) in ['agent', 'property_manager', 'manager', 'landlord']
+            && canReadProperty(orgId, resource.data.propertyId)
+          );
+      }
+
+      match /commissions/{commissionId} {
+        allow read: if isOrgAdmin(orgId) || resource.data.agentId == uid();
+        allow create: if isOrgAdmin(orgId)
+          && request.resource.data.orgId == orgId
+          && hasNonEmptyString(request.resource.data, 'transactionId');
+        allow update, delete: if isOrgAdmin(orgId) || resource.data.agentId == uid();
+      }
+
+      match /leads/{leadId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgAdmin(orgId) || memberRole(orgId) in ['agent', 'manager'];
+        allow update, delete: if isOrgAdmin(orgId) || memberRole(orgId) in ['agent', 'manager'];
+      }
+
+      match /documents/{documentId} {
+        allow read: if canReadDocument(resource.data);
+        allow create: if (
+            isOrgAdmin(orgId)
+            && request.resource.data.orgId == orgId
+            && hasNonEmptyString(request.resource.data, 'propertyId')
+            && request.resource.data.visibility in ['private', 'tenant', 'landlord', 'property_team', 'org']
+          )
+          || (
+            isOrgMember(orgId)
+            && request.resource.data.orgId == orgId
+            && request.resource.data.propertyId is string
+            && request.resource.data.propertyId != ''
+            && request.resource.data.visibility in ['private', 'tenant', 'landlord', 'property_team', 'org']
+            && canReadProperty(orgId, request.resource.data.propertyId)
+          );
+        allow update, delete: if isOrgAdmin(orgId);
+      }
+
+      match /maintenanceRequests/{requestId} {
+        allow read: if isOrgAdmin(orgId)
+          || (
+            resource.data.propertyId is string
+            && canReadProperty(orgId, resource.data.propertyId)
+          )
+          || resource.data.tenantUid == uid()
+          || resource.data.assignedVendorUid == uid()
+          || resource.data.assignedStaffUid == uid()
+          || resource.data.assignedVendorId == uid()
+          || resource.data.assignedStaffId == uid();
+
+        allow create: if (
+            isOrgAdmin(orgId)
+            && request.resource.data.orgId == orgId
+            && hasNonEmptyString(request.resource.data, 'propertyId')
+          )
+          || (
+            signedIn()
+            && request.resource.data.tenantUid == uid()
+            && request.resource.data.orgId == orgId
+            && request.resource.data.propertyId is string
+            && request.resource.data.propertyId != ''
+            && hasNonEmptyString(request.resource.data, 'unitId')
+            && hasNonEmptyString(request.resource.data, 'tenantId')
+            && canReadProperty(orgId, request.resource.data.propertyId)
+          );
+
+        allow update: if isOrgAdmin(orgId)
+          || (
+            resource.data.assignedVendorUid == uid()
+            || resource.data.assignedStaffUid == uid()
+            ||
+            resource.data.assignedVendorId == uid()
+            || resource.data.assignedStaffId == uid()
+          )
+          || (
+            resource.data.tenantUid == uid()
+            && request.resource.data.tenantUid == resource.data.tenantUid
+            && request.resource.data.status in ['new', 'in_progress']
+          );
+
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      match /reports/{reportId} {
+        allow read: if isOrgMember(orgId);
+        allow create, update, delete: if isOrgAdmin(orgId);
+      }
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Legacy top-level mirrors (read-compat only)
+    match /properties/{propertyId} {
+      allow read: if isOrgMember(resource.data.orgId)
+        && canReadProperty(resource.data.orgId, resource.data.propertyId);
+      allow write: if false;
+    }
+
+    match /units/{unitId} {
+      allow read: if isOrgMember(resource.data.orgId)
+        && canReadProperty(resource.data.orgId, resource.data.propertyId);
+      allow write: if false;
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || isSelfProfile(resource.data)
+        || (
+          resource.data.currentPropertyId is string
+          && canReadProperty(resource.data.orgId, resource.data.currentPropertyId)
+        );
+      allow write: if false;
+    }
+
+    match /landlords/{landlordId} {
+      allow read: if isOrgAdmin(resource.data.orgId) || isSelfProfile(resource.data);
+      allow write: if false;
+    }
+
+    match /agents/{agentId} {
+      allow read: if isOrgAdmin(resource.data.orgId) || isSelfProfile(resource.data);
+      allow write: if false;
+    }
+
+    match /vendors/{vendorId} {
+      allow read: if isOrgAdmin(resource.data.orgId) || isSelfProfile(resource.data);
+      allow write: if false;
+    }
+
+    match /leases/{leaseId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || (
+          resource.data.propertyId is string
+          && canReadProperty(resource.data.orgId, resource.data.propertyId)
+        )
+        || resource.data.tenantUserId == uid();
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || (
+          resource.data.propertyId is string
+          && canReadProperty(resource.data.orgId, resource.data.propertyId)
+        )
+        || resource.data.tenantUid == uid()
+        || resource.data.tenantUserId == uid();
+      allow write: if false;
+    }
+
+    match /documents/{documentId} {
+      allow read: if canReadDocument(resource.data);
+      allow write: if false;
+    }
+
+    match /maintenanceRequests/{requestId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || (
+          resource.data.propertyId is string
+          && canReadProperty(resource.data.orgId, resource.data.propertyId)
+        )
+        || resource.data.tenantUid == uid()
+        || resource.data.assignedVendorUid == uid()
+        || resource.data.assignedStaffUid == uid()
+        || resource.data.assignedVendorId == uid()
+        || resource.data.assignedStaffId == uid();
+      allow write: if false;
+    }
+  }
+}
