@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Angular build cache
+.angular/
+
+# Build output
+dist/
+
+# Firebase local state/cache
+.firebase/
+firebase-debug.log
+*.log
+
+# Test scaffolding output
+.tmp-tests/
+
+# Stray build logs
+build-final.txt
+build-output.txt
+build-superadmin-fix.txt
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Env files (should never be committed)
+.env
+.env.*
