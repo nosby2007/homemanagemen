@@ -1,7 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { map } from 'rxjs/operators';
+import { of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { PaymentsOverviewService, PaymentLedgerRow } from './payments.overview.service';
 
 @Component({
@@ -15,6 +16,8 @@ import { PaymentsOverviewService, PaymentLedgerRow } from './payments.overview.s
           <p>Monitor payment status, outstanding balances, and rent collection trends.</p>
         </div>
       </header>
+
+      <div class="state error" *ngIf="error">{{ error }}</div>
 
       <div class="kpi-grid" *ngIf="rows$ | async as rows">
         <article class="kpi"><span>Total Payments</span><strong>{{ rows.length }}</strong></article>
@@ -83,13 +86,21 @@ import { PaymentsOverviewService, PaymentLedgerRow } from './payments.overview.s
     .badge.new { background:rgba(59,130,246,.2); color:#bfdbfe; }
     .empty { padding:14px; color:#94a3b8; }
     small { color:#94a3b8; }
+    .state.error { background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.35); color:#fecaca; border-radius:10px; padding:10px 12px; }
     @media (max-width: 1200px) { .kpi-grid { grid-template-columns:1fr; } .toolbar { grid-template-columns:1fr; } .thead, .row { grid-template-columns:1fr; } }
   `],
 })
 export class PaymentsListPage {
   private overview = inject(PaymentsOverviewService);
 
-  rows$ = this.overview.listLatest().pipe(map((items: any) => items as PaymentLedgerRow[]));
+  error = '';
+  rows$ = this.overview.listLatest().pipe(
+    map((items: any) => items as PaymentLedgerRow[]),
+    catchError((err: any) => {
+      this.error = err?.message || 'Unable to load payments.';
+      return of([] as PaymentLedgerRow[]);
+    }),
+  );
   query = '';
   statusFilter: 'all' | 'paid' | 'pending' | 'failed' | 'cancelled' | 'new' = 'all';
 

@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
 import { LeasesService } from './leases.service';
 
@@ -11,8 +12,8 @@ import { LeasesService } from './leases.service';
   template: `
     <div class="page">
       <div class="card">
-        <div class="h1">New Lease</div>
-        <div class="muted">Create a comprehensive lease agreement for this property.</div>
+        <div class="h1">{{ isEdit ? 'Edit Lease' : 'New Lease' }}</div>
+        <div class="muted">{{ isEdit ? 'Update this lease agreement.' : 'Create a comprehensive lease agreement for this property.' }}</div>
 
         <label class="lbl">Tenant NAME *</label>
         <input class="input" [(ngModel)]="tenantId" placeholder="Enter tenant NAME" />
@@ -117,7 +118,7 @@ import { LeasesService } from './leases.service';
         <textarea class="input textarea" [(ngModel)]="maintenanceResponsibilities" placeholder="Outline tenant maintenance responsibilities..." rows="3"></textarea>
 
         <div class="actions">
-          <button class="btn" (click)="create()">Create Lease</button>
+          <button class="btn" (click)="submit()" [disabled]="saving">{{ saving ? 'Saving...' : (isEdit ? 'Update Lease' : 'Create Lease') }}</button>
           <button class="btn secondary" (click)="back()">Cancel</button>
         </div>
 
@@ -169,13 +170,52 @@ export class LeaseFormPage {
   specialTerms = '';
   maintenanceResponsibilities = '';
   errorMessage = '';
+  saving = false;
+
+  isEdit = false;
+  private leaseId = '';
+
+  constructor() {
+    this.init();
+  }
+
+  private async init() {
+    this.leaseId = String(this.route.snapshot.paramMap.get('leaseId') || '').trim();
+    if (!this.leaseId) return;
+
+    const propertyId = String(this.route.snapshot.paramMap.get('propertyId') || '').trim();
+    if (!propertyId) return;
+
+    this.isEdit = true;
+    try {
+      const lease = await firstValueFrom(this.leases.get(propertyId, this.leaseId)) as any;
+      if (!lease) return;
+      this.tenantId = lease.tenantId || '';
+      this.unitId = lease.unitId || '';
+      this.landlordId = lease.landlordId || '';
+      this.startDate = this.toDateInputValue(lease.startDate);
+      this.endDate = this.toDateInputValue(lease.endDate);
+      this.monthlyRent = lease.monthlyRent != null ? String(lease.monthlyRent) : '';
+      this.securityDeposit = lease.securityDeposit != null ? String(lease.securityDeposit) : '';
+      this.paymentDueDay = lease.paymentDueDay != null ? String(lease.paymentDueDay) : '';
+    } catch (err: any) {
+      this.errorMessage = err?.message || 'Unable to load this lease.';
+    }
+  }
 
   private toTimestamp(dateString: string): number | undefined {
     if (!dateString) return undefined;
     return new Date(dateString).getTime();
   }
 
-  async create() {
+  private toDateInputValue(value: unknown): string {
+    if (!value) return '';
+    const ms = typeof value === 'number' ? value : (value as any)?.toMillis?.() ?? 0;
+    if (!ms) return '';
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
+  async submit() {
     this.errorMessage = '';
     const propertyId = String(this.route.snapshot.paramMap.get('propertyId') || '').trim();
     if (!propertyId) {
@@ -190,14 +230,32 @@ export class LeaseFormPage {
       this.errorMessage = 'Unit is required.';
       return;
     }
-    const leaseId = await this.leases.create(propertyId, {
+
+    const payload = {
       tenantId: (this.tenantId || '').trim() || undefined,
       unitId: (this.unitId || '').trim() || undefined,
       landlordId: (this.landlordId || '').trim() || undefined,
+      startDate: this.toTimestamp(this.startDate),
+      endDate: this.toTimestamp(this.endDate),
       monthlyRent: this.monthlyRent ? Number(this.monthlyRent) : 0,
-      securityDeposit: this.securityDeposit ? Number(this.securityDeposit) : 0
-    });
-    await this.router.navigateByUrl(`/properties/${propertyId}/leases/${leaseId}`);
+      securityDeposit: this.securityDeposit ? Number(this.securityDeposit) : 0,
+      paymentDueDay: this.paymentDueDay ? Number(this.paymentDueDay) : undefined,
+    } as any;
+
+    this.saving = true;
+    try {
+      if (this.isEdit) {
+        await this.leases.update(propertyId, this.leaseId, payload);
+        await this.router.navigateByUrl(`/properties/${propertyId}/leases/${this.leaseId}`);
+      } else {
+        const leaseId = await this.leases.create(propertyId, payload);
+        await this.router.navigateByUrl(`/properties/${propertyId}/leases/${leaseId}`);
+      }
+    } catch (err: any) {
+      this.errorMessage = err?.message || 'Failed to save lease.';
+    } finally {
+      this.saving = false;
+    }
   }
 
   async back() {

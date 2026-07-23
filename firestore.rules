@@ -581,9 +581,48 @@ service cloud.firestore {
         allow create, update, delete: if isOrgAdmin(orgId) || memberRole(orgId) in ['landlord', 'maintenance', 'vendor', 'staff'];
       }
 
+      match /branding/{docId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId);
+      }
+
       match /{document=**} {
         allow read, write: if false;
       }
+    }
+
+    // Collection-group rules: required for cross-property/cross-org queries
+    // (dashboard KPIs, admin payments ledger, super-admin metrics). Writes stay
+    // false - real writes go through the path-scoped rules above, which can
+    // enforce path-bound consistency a collection-group match cannot.
+    match /{path=**}/inspections/{inspectionId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || (resource.data.propertyId is string && canReadProperty(resource.data.orgId, resource.data.propertyId));
+      allow write: if false;
+    }
+    match /{path=**}/findings/{findingId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || (resource.data.propertyId is string && canReadProperty(resource.data.orgId, resource.data.propertyId));
+      allow write: if false;
+    }
+    match /{path=**}/payments/{paymentId} {
+      allow read: if isOrgAdmin(resource.data.orgId)
+        || (resource.data.propertyId is string && canReadProperty(resource.data.orgId, resource.data.propertyId))
+        || resource.data.tenantUid == uid()
+        || resource.data.tenantUserId == uid();
+      allow write: if false;
+    }
+    match /{path=**}/workOrders/{workOrderId} {
+      allow read: if isOrgAdmin(resource.data.orgId);
+      allow write: if false;
+    }
+    match /{path=**}/reports/{reportId} {
+      allow read: if isOrgAdmin(resource.data.orgId);
+      allow write: if false;
+    }
+    match /{path=**}/members/{memberId} {
+      allow read: if isOrgAdmin(resource.data.orgId);
+      allow write: if false;
     }
 
     // Legacy top-level mirrors (read-compat only)

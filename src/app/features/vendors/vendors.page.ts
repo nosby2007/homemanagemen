@@ -49,9 +49,10 @@ import { OrgContextService } from '../../core/org/org-context.service';
             <input [(ngModel)]="formData.phone" name="phone" placeholder="Phone" />
             <input [(ngModel)]="formData.serviceType" name="serviceType" placeholder="Service type" />
             <input [(ngModel)]="formData.propertyIdsText" name="propertyIdsText" placeholder="Property IDs (comma separated)" required />
+            <div class="state error" *ngIf="formError">{{ formError }}</div>
             <div class="actions">
               <button type="button" (click)="showForm = false">Cancel</button>
-              <button type="submit" class="primary">Create</button>
+              <button type="submit" class="primary" [disabled]="creating">{{ creating ? 'Creating...' : 'Create' }}</button>
             </div>
           </form>
         </div>
@@ -98,6 +99,8 @@ export class VendorsPage implements OnInit, OnDestroy {
   loading = true;
   error = '';
   showForm = false;
+  creating = false;
+  formError = '';
   formData: any = { companyName: '', contactName: '', email: '', phone: '', serviceType: '', propertyIdsText: '' };
 
   ngOnInit() {
@@ -113,17 +116,25 @@ export class VendorsPage implements OnInit, OnDestroy {
 
   async create() {
     if (!this.formData.companyName) return;
+    this.formError = '';
     const propertyIds = String(this.formData.propertyIdsText || '')
       .split(',')
       .map((x: string) => x.trim())
       .filter((x: string) => !!x);
-    await this.svc.create({
-      ...this.formData,
-      propertyIds,
-      defaultPropertyId: propertyIds[0] || undefined,
-    });
-    this.formData = { companyName: '', contactName: '', email: '', phone: '', serviceType: '', propertyIdsText: '' };
-    this.showForm = false;
+    this.creating = true;
+    try {
+      await this.svc.create({
+        ...this.formData,
+        propertyIds,
+        defaultPropertyId: propertyIds[0] || undefined,
+      });
+      this.formData = { companyName: '', contactName: '', email: '', phone: '', serviceType: '', propertyIdsText: '' };
+      this.showForm = false;
+    } catch (err: any) {
+      this.formError = err?.message || 'Failed to create vendor.';
+    } finally {
+      this.creating = false;
+    }
   }
 
   async sendInvitation(vendor: any) {
@@ -165,6 +176,10 @@ export class VendorsPage implements OnInit, OnDestroy {
 
   async disableAccess(vendor: any) {
     if (!vendor?.id) return;
-    await this.svc.update(String(vendor.id), { authStatus: 'disabled' } as any);
+    try {
+      await this.svc.update(String(vendor.id), { authStatus: 'disabled' } as any);
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to disable access.';
+    }
   }
 }

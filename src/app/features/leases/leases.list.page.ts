@@ -31,6 +31,7 @@ const styles = `
 .btn-delete{background:linear-gradient(135deg, rgba(239,68,68,.90) 0%, rgba(220,38,38,.90) 100%);color:#fff;box-shadow:0 2px 4px rgba(239,68,68,.3)}
 .btn-delete:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(239,68,68,.4)}
 .empty-state{text-align:center;padding:48px 24px;color:rgba(148,163,184,.7);font-size:14px}
+.state.error{border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.12);color:#fecaca;border-radius:12px;padding:12px 16px;margin-top:16px}
 `;
 
 @Component({
@@ -46,6 +47,8 @@ const styles = `
         <div class="row">
           <button class="btn" (click)="navigateToCreateLease(vm.propertyId)">+ Create Lease</button>
         </div>
+
+        <div class="state error" *ngIf="error">{{ error }}</div>
 
         <div class="list">
           <div class="item" *ngFor="let l of vm.leases">
@@ -73,6 +76,8 @@ export class LeasesListPage {
   private router = inject(Router);
   private leasesSvc = inject(LeasesService);
 
+  error = '';
+
   vm$ = this.route.paramMap.pipe(
     switchMap(pm => {
       const propertyId = pm.get('propertyId')!;
@@ -90,11 +95,15 @@ export class LeasesListPage {
     this.router.navigate(['/properties', propertyId, 'leases', leaseId, 'edit']);
   }
 
-  deleteLease(propertyId: string, leaseId: string) {
-    if (confirm('Are you sure you want to delete this lease?')) {
-      this.leasesSvc.delete(propertyId, leaseId);
+  async deleteLease(propertyId: string, leaseId: string) {
+    if (!confirm('Are you sure you want to delete this lease?')) return;
+    this.error = '';
+    try {
+      await this.leasesSvc.delete(propertyId, leaseId);
       // Refresh the list by re-triggering the observable
       window.location.reload();
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to delete lease.';
     }
   }
 }

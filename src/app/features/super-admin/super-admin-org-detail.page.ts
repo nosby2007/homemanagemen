@@ -29,6 +29,8 @@ type TabKey = 'branding' | 'members' | 'kpi' | 'actions';
       </div>
     </div>
 
+    <div class="error" *ngIf="error">{{ error }}</div>
+
     <div class="tabs">
       <button class="tab" [class.active]="tab==='branding'" (click)="setTab('branding')">Branding</button>
       <button class="tab" [class.active]="tab==='members'"  (click)="setTab('members')">Members</button>
@@ -233,7 +235,7 @@ type TabKey = 'branding' | 'members' | 'kpi' | 'actions';
 }
 
     .empty{padding:12px;opacity:.75}
-    .error{padding:10px 12px;border-radius:12px;background:rgba(239,68,68,.14);border:1px solid rgba(239,68,68,.35)}
+    .error{padding:10px 12px;border-radius:12px;background:rgba(239,68,68,.14);border:1px solid rgba(239,68,68,.35);color:#fecaca;margin-bottom:10px}
     @media (max-width: 1100px){
       .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
       .charts{grid-template-columns:1fr}

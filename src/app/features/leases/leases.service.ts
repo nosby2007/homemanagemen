@@ -14,11 +14,13 @@ import {
   Timestamp
 } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
+import { firstValueFrom } from 'rxjs';
 import { OrgContextService } from '../../core/org/org-context.service';
 import { stripUndefined } from '../../core/utils/firestore-clean';
 import { requireLeaseScope } from '../../core/utils/property-scope';
 import { UnitsService } from '../units/units.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { PropertiesService } from '../properties/properties.service';
 
 
 export type LeaseStatus = 'active' | 'pending' | 'expired' | 'terminated';
@@ -50,6 +52,7 @@ export class LeasesService {
   private org = inject(OrgContextService);
   private units = inject(UnitsService);
   private tenants = inject(TenantsService);
+  private properties = inject(PropertiesService);
 
   private requireUid(): string {
     const u = this.auth.currentUser?.uid;
@@ -69,6 +72,17 @@ export class LeasesService {
   list(propertyId: string) {
     const q = query(this.leasesCol(propertyId), orderBy('updatedAt', 'desc'), limit(200));
     return collectionData(q, { idField: 'id' }) as any;
+  }
+
+  /** Aggregates leases across every property in the org (loops the already-ruled per-property collection). */
+  async listAllForOrg(): Promise<Lease[]> {
+    const properties = await firstValueFrom(this.properties.list());
+    const perProperty = await Promise.all(
+      (properties as any[]).map((p) =>
+        firstValueFrom(this.list(String(p.id))).catch(() => [] as Lease[])
+      )
+    );
+    return (perProperty as Lease[][]).flat();
   }
 
   get(propertyId: string, leaseId: string) {

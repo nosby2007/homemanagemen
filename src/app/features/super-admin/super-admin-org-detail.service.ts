@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Firestore } from '@angular/fire/firestore';
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -10,6 +11,7 @@ import {
   query,
   setDoc,
   serverTimestamp,
+  where,
   getCountFromServer,
 } from 'firebase/firestore';
 
@@ -88,13 +90,13 @@ export class SuperAdminOrgDetailService {
 
   async getOrgTotals(orgId: string): Promise<OrgTotals> {
     const membersCol = collection(this.fs as any, `orgs/${orgId}/members`);
-    const inspectionsCol = collection(this.fs as any, `orgs/${orgId}/inspections`);
+    const inspectionsQuery = query(collectionGroup(this.fs as any, 'inspections'), where('orgId', '==', orgId));
     const workOrdersCol = collection(this.fs as any, `orgs/${orgId}/workOrders`);
     const reportsCol = collection(this.fs as any, `orgs/${orgId}/reports`);
 
     const [m, i, w, r] = await Promise.all([
       getCountFromServer(query(membersCol as any) as any),
-      getCountFromServer(query(inspectionsCol as any) as any),
+      getCountFromServer(inspectionsQuery as any),
       getCountFromServer(query(workOrdersCol as any) as any),
       getCountFromServer(query(reportsCol as any) as any),
     ]);

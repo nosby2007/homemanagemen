@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.switchOrganization = exports.acceptInvitation = exports.validateInvitation = exports.revokeInvitation = exports.remindPendingInvitations = exports.resendInvitation = exports.createInvitation = exports.createOrganization = exports.createBusinessProfile = exports.hello = exports.generateReportPdf = void 0;
+exports.switchOrganization = exports.acceptInvitation = exports.validateInvitation = exports.revokeInvitation = exports.remindPendingInvitations = exports.resendInvitation = exports.createInvitation = exports.createOrganization = exports.repairTenantAssignment = exports.createBusinessProfile = exports.hello = exports.generateReportPdf = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -767,6 +767,87 @@ exports.createBusinessProfile = (0, https_1.onCall)(async (request) => {
     await writeActivity(orgId, uid, 'create_business_profile', coll, id, `Created ${targetType} profile`);
     return { id, orgId, targetType, authStatus: 'not_invited' };
 });
+/**
+ * Recreates a tenant's propertyAssignments doc from their tenant profile's
+ * currentPropertyId/currentUnitId. Needed because that doc is normally only
+ * created once, inside acceptInvitation - an already-active tenant whose
+ * assignment was never created (or was created before a unit was required)
+ * otherwise has no self-service or admin path to fix it.
+ */
+exports.repairTenantAssignment = (0, https_1.onCall)(async (request) => {
+    const uid = requireAuth(request);
+    const data = request.data || {};
+    const orgId = String(data.orgId || '').trim();
+    const tenantId = String(data.tenantId || '').trim();
+    if (!orgId || !tenantId) {
+        throw new https_1.HttpsError('invalid-argument', 'orgId and tenantId are required.');
+    }
+    await assertOrgManager(uid, orgId);
+    const db = admin.firestore();
+    const tenantSnap = await db.doc(`orgs/${orgId}/tenants/${tenantId}`).get();
+    if (!tenantSnap.exists)
+        throw new https_1.HttpsError('not-found', 'Tenant profile not found.');
+    const tenant = tenantSnap.data();
+    const tenantUserId = String(tenant.userId || tenant.userUid || '').trim();
+    const propertyId = String(tenant.currentPropertyId || '').trim();
+    const unitId = String(tenant.currentUnitId || '').trim();
+    if (!tenantUserId) {
+        throw new https_1.HttpsError('failed-precondition', 'Tenant is not linked to a user account yet. Send an invitation first.');
+    }
+    if (!propertyId || !unitId) {
+        throw new https_1.HttpsError('failed-precondition', 'Tenant profile is missing a property or unit. Edit the tenant record first.');
+    }
+    const now = nowMs();
+    const email = normalizeEmail(String(tenant.email || ''));
+    const membershipId = `${orgId}_${tenantUserId}`;
+    await db.doc(`organizationMembers/${membershipId}`).set({
+        id: membershipId,
+        orgId,
+        userId: tenantUserId,
+        email,
+        role: 'tenant',
+        defaultPropertyId: propertyId,
+        propertyIds: admin.firestore.FieldValue.arrayUnion(propertyId),
+        targetType: 'tenant',
+        targetId: tenantId,
+        status: 'active',
+        invitedBy: uid,
+        updatedAt: now,
+    }, { merge: true });
+    await db.doc(`orgs/${orgId}/members/${tenantUserId}`).set({
+        uid: tenantUserId,
+        userId: tenantUserId,
+        email,
+        role: 'tenant',
+        status: 'active',
+        defaultPropertyId: propertyId,
+        propertyIds: admin.firestore.FieldValue.arrayUnion(propertyId),
+        updatedAt: now,
+    }, { merge: true });
+    const assignmentId = `${orgId}_${propertyId}_${tenantUserId}_tenant_${tenantId}`;
+    await db.doc(`propertyAssignments/${assignmentId}`).set({
+        id: assignmentId,
+        orgId,
+        propertyId,
+        unitId,
+        userId: tenantUserId,
+        email,
+        role: 'tenant',
+        targetType: 'tenant',
+        targetId: tenantId,
+        accessLevel: 'unit',
+        status: 'active',
+        invitedBy: uid,
+        invitationId: tenant.invitationId || null,
+        createdAt: now,
+        updatedAt: now,
+    }, { merge: true });
+    if (tenant.authStatus !== 'active') {
+        await db.doc(`orgs/${orgId}/tenants/${tenantId}`).set({ authStatus: 'active', updatedAt: now }, { merge: true });
+    }
+    await writeActivity(orgId, uid, 'repair_tenant_assignment', 'tenants', tenantId, 'Repaired property/unit assignment for tenant');
+    return { assignmentId, propertyId, unitId };
+});
 exports.createOrganization = (0, https_1.onCall)(async (request) => {
     const uid = requireAuth(request);
     const data = request.data || {};
@@ -819,6 +900,9 @@ exports.createInvitation = (0, https_1.onCall)({ secrets: ['SENDGRID_API_KEY', '
     }
     if (!ALLOWED_INVITE_ROLES.has(role)) {
         throw new https_1.HttpsError('invalid-argument', `Role ${role} is not allowed for invitation.`);
+    }
+    if (targetType === 'tenant' && !unitId) {
+        throw new https_1.HttpsError('invalid-argument', 'A unit is required to invite a tenant.');
     }
     await assertOrgManager(uid, orgId);
     const target = await getTargetProfile(orgId, targetType, targetId);

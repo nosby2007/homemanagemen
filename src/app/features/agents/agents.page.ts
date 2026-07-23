@@ -165,6 +165,10 @@ export class AgentsPage implements OnInit, OnDestroy {
 
   async disableAccess(agent: any) {
     if (!agent?.id) return;
-    await this.svc.update(String(agent.id), { authStatus: 'disabled' } as any);
+    try {
+      await this.svc.update(String(agent.id), { authStatus: 'disabled' } as any);
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to disable access.';
+    }
   }
 }

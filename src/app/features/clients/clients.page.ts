@@ -214,6 +214,10 @@ export class ClientsPage implements OnInit, OnDestroy {
 
   async disableAccess(client: any) {
     if (!client?.id) return;
-    await this.svc.update(String(client.id), { authStatus: 'disabled' } as any);
+    try {
+      await this.svc.update(String(client.id), { authStatus: 'disabled' } as any);
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to disable access.';
+    }
   }
 }
