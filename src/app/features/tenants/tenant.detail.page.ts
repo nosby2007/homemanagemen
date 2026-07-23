@@ -41,9 +41,14 @@ import { OrgContextService } from '../../core/org/org-context.service';
               <button type="button" *ngIf="(tenant.authStatus || 'not_invited') === 'not_invited'" (click)="sendInvitation(tenant)">Send Invitation</button>
               <button type="button" *ngIf="tenant.authStatus === 'invited'" (click)="resendInvitation(tenant)">Resend Invitation</button>
               <button type="button" class="warn" *ngIf="tenant.authStatus === 'active'" (click)="disableAccess(tenant)">Disable Access</button>
+              <button type="button" *ngIf="tenant.userId || tenant.userUid" [disabled]="repairing" (click)="repairAssignment(tenant)">
+                {{ repairing ? 'Repairing...' : 'Repair Property Assignment' }}
+              </button>
             </div>
           </div>
           <div class="row" *ngIf="inviteError"><span>Invite error</span><strong class="error-text">{{ inviteError }}</strong></div>
+          <div class="row" *ngIf="repairError"><span>Repair error</span><strong class="error-text">{{ repairError }}</strong></div>
+          <div class="row" *ngIf="repairSuccess"><span>Repair result</span><strong class="ok-text">{{ repairSuccess }}</strong></div>
           <div class="row"><span>Created</span><strong>{{ tenant.createdAt | date:'medium' }}</strong></div>
           <div class="row"><span>Updated</span><strong>{{ tenant.updatedAt | date:'medium' }}</strong></div>
         </article>
@@ -67,6 +72,7 @@ import { OrgContextService } from '../../core/org/org-context.service';
     .inline-actions { display:flex; gap:8px; }
     .inline-actions button.warn { background: rgba(239, 68, 68, .2); color: #fecaca; }
     .error-text { color: #fecaca; }
+    .ok-text { color: #bbf7d0; }
   `],
 })
 export class TenantDetailPage {
@@ -81,6 +87,9 @@ export class TenantDetailPage {
   );
 
   inviteError = '';
+  repairing = false;
+  repairError = '';
+  repairSuccess = '';
 
   async edit(tenantId: string) {
     await this.router.navigateByUrl(`/tenants/${tenantId}/edit`);
@@ -134,5 +143,21 @@ export class TenantDetailPage {
   async disableAccess(tenant: any) {
     if (!tenant?.id) return;
     await this.tenants.update(String(tenant.id), { authStatus: 'disabled' } as any);
+  }
+
+  async repairAssignment(tenant: any) {
+    if (!tenant?.id) return;
+    this.repairError = '';
+    this.repairSuccess = '';
+    this.repairing = true;
+    try {
+      const result = await this.invitations.repairTenantAssignment(this.org.requireOrgId(), String(tenant.id));
+      this.repairSuccess = `Assignment fixed: property ${result.propertyId}, unit ${result.unitId}.`;
+      tenant.authStatus = 'active';
+    } catch (err: any) {
+      this.repairError = err?.message || 'Failed to repair assignment.';
+    } finally {
+      this.repairing = false;
+    }
   }
 }

@@ -129,4 +129,10 @@ export class InvitationService {
   async acceptPropertyInvitation(token: string, password: string, displayName: string, phone?: string) {
     return this.acceptInvitation({ token, password, displayName, phone });
   }
+
+  async repairTenantAssignment(orgId: string, tenantId: string) {
+    const call = httpsCallable(this.functions, 'repairTenantAssignment');
+    const result: any = await call({ orgId, tenantId });
+    return result?.data as { assignmentId: string; propertyId: string; unitId: string };
+  }
 }

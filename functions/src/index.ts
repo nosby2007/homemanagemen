@@ -943,6 +943,103 @@ export const createBusinessProfile = onCall<CreateBusinessProfileData>(async (re
   return { id, orgId, targetType, authStatus: 'not_invited' };
 });
 
+type RepairTenantAssignmentData = {
+  orgId: string;
+  tenantId: string;
+};
+
+/**
+ * Recreates a tenant's propertyAssignments doc from their tenant profile's
+ * currentPropertyId/currentUnitId. Needed because that doc is normally only
+ * created once, inside acceptInvitation - an already-active tenant whose
+ * assignment was never created (or was created before a unit was required)
+ * otherwise has no self-service or admin path to fix it.
+ */
+export const repairTenantAssignment = onCall<RepairTenantAssignmentData>(async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || ({} as RepairTenantAssignmentData);
+  const orgId = String(data.orgId || '').trim();
+  const tenantId = String(data.tenantId || '').trim();
+  if (!orgId || !tenantId) {
+    throw new HttpsError('invalid-argument', 'orgId and tenantId are required.');
+  }
+
+  await assertOrgManager(uid, orgId);
+
+  const db = admin.firestore();
+  const tenantSnap = await db.doc(`orgs/${orgId}/tenants/${tenantId}`).get();
+  if (!tenantSnap.exists) throw new HttpsError('not-found', 'Tenant profile not found.');
+  const tenant = tenantSnap.data() as any;
+
+  const tenantUserId = String(tenant.userId || tenant.userUid || '').trim();
+  const propertyId = String(tenant.currentPropertyId || '').trim();
+  const unitId = String(tenant.currentUnitId || '').trim();
+
+  if (!tenantUserId) {
+    throw new HttpsError('failed-precondition', 'Tenant is not linked to a user account yet. Send an invitation first.');
+  }
+  if (!propertyId || !unitId) {
+    throw new HttpsError('failed-precondition', 'Tenant profile is missing a property or unit. Edit the tenant record first.');
+  }
+
+  const now = nowMs();
+  const email = normalizeEmail(String(tenant.email || ''));
+
+  const membershipId = `${orgId}_${tenantUserId}`;
+  await db.doc(`organizationMembers/${membershipId}`).set({
+    id: membershipId,
+    orgId,
+    userId: tenantUserId,
+    email,
+    role: 'tenant',
+    defaultPropertyId: propertyId,
+    propertyIds: admin.firestore.FieldValue.arrayUnion(propertyId),
+    targetType: 'tenant',
+    targetId: tenantId,
+    status: 'active',
+    invitedBy: uid,
+    updatedAt: now,
+  }, { merge: true });
+
+  await db.doc(`orgs/${orgId}/members/${tenantUserId}`).set({
+    uid: tenantUserId,
+    userId: tenantUserId,
+    email,
+    role: 'tenant',
+    status: 'active',
+    defaultPropertyId: propertyId,
+    propertyIds: admin.firestore.FieldValue.arrayUnion(propertyId),
+    updatedAt: now,
+  }, { merge: true });
+
+  const assignmentId = `${orgId}_${propertyId}_${tenantUserId}_tenant_${tenantId}`;
+  await db.doc(`propertyAssignments/${assignmentId}`).set({
+    id: assignmentId,
+    orgId,
+    propertyId,
+    unitId,
+    userId: tenantUserId,
+    email,
+    role: 'tenant',
+    targetType: 'tenant',
+    targetId: tenantId,
+    accessLevel: 'unit',
+    status: 'active',
+    invitedBy: uid,
+    invitationId: tenant.invitationId || null,
+    createdAt: now,
+    updatedAt: now,
+  }, { merge: true });
+
+  if (tenant.authStatus !== 'active') {
+    await db.doc(`orgs/${orgId}/tenants/${tenantId}`).set({ authStatus: 'active', updatedAt: now }, { merge: true });
+  }
+
+  await writeActivity(orgId, uid, 'repair_tenant_assignment', 'tenants', tenantId, 'Repaired property/unit assignment for tenant');
+
+  return { assignmentId, propertyId, unitId };
+});
+
 export const createOrganization = onCall<CreateOrganizationData>(async (request) => {
   const uid = requireAuth(request);
   const data = request.data || ({} as CreateOrganizationData);
