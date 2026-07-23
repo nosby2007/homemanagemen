@@ -16,6 +16,7 @@ import { Auth } from '@angular/fire/auth';
 import { OrgContextService } from '../../core/org/org-context.service';
 import { UnitRecord } from '../../core/models/domain.models';
 import { Observable } from 'rxjs';
+import { stripUndefined } from '../../core/utils/firestore-clean';
 
 @Injectable({ providedIn: 'root' })
 export class UnitsService {
@@ -58,15 +59,15 @@ export class UnitsService {
       updatedAt: now,
     };
 
-    await setDoc(doc(this.fs, `orgs/${this.org.requireOrgId()}/units/${id}`), data as any);
+    await setDoc(doc(this.fs, `orgs/${this.org.requireOrgId()}/units/${id}`), stripUndefined(data) as any);
     return id;
   }
 
   async update(unitId: string, patch: Partial<UnitRecord>) {
-    await updateDoc(doc(this.fs, `orgs/${this.org.requireOrgId()}/units/${unitId}`), {
+    await updateDoc(doc(this.fs, `orgs/${this.org.requireOrgId()}/units/${unitId}`), stripUndefined({
       ...patch,
       updatedAt: Date.now(),
-    } as any);
+    }) as any);
   }
 
   async remove(unitId: string) {

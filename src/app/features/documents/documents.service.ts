@@ -16,6 +16,7 @@ import { StorageUploadService } from '../../core/utils/storage-upload.service';
 import { DocumentCategory, DocumentRecord } from '../../core/models/domain.models';
 import { Observable } from 'rxjs';
 import { requireDocumentScope } from '../../core/utils/property-scope';
+import { stripUndefined } from '../../core/utils/firestore-clean';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentsService {
@@ -95,7 +96,7 @@ export class DocumentsService {
       updatedAt: now,
     };
 
-    await setDoc(doc(this.fs, `orgs/${orgId}/documents/${id}`), docDataValue as any);
+    await setDoc(doc(this.fs, `orgs/${orgId}/documents/${id}`), stripUndefined(docDataValue) as any);
     return id;
   }
 }
