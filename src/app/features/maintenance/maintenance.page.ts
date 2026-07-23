@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { WorkOrdersService } from '../work-orders/workorders.service';
+import { MaintenanceService } from './maintenance.service';
 
 @Component({
   standalone: true,
@@ -14,7 +15,12 @@ import { WorkOrdersService } from '../work-orders/workorders.service';
         <p>Manage work orders, assignees, priorities, and workflow statuses.</p>
       </header>
 
-      <article class="card">
+      <div class="tabs">
+        <button type="button" [class.active]="tab === 'workOrders'" (click)="tab = 'workOrders'">Work Orders</button>
+        <button type="button" [class.active]="tab === 'tenantRequests'" (click)="tab = 'tenantRequests'">Tenant Requests</button>
+      </div>
+
+      <article class="card" *ngIf="tab === 'workOrders'">
         <div class="filters">
           <input [(ngModel)]="search" placeholder="Search summary or property..." />
           <select [(ngModel)]="statusFilter">
@@ -50,6 +56,29 @@ import { WorkOrdersService } from '../work-orders/workorders.service';
         </div>
       </article>
 
+      <article class="card" *ngIf="tab === 'tenantRequests'">
+        <div class="table" *ngIf="tenantRequests$ | async as requests">
+          <div class="thead">
+            <div>Title</div><div>Property / Unit</div><div>Status</div><div>Priority</div><div>Updated</div><div>Actions</div>
+          </div>
+          <div class="row" *ngFor="let r of requests">
+            <div>
+              <div class="strong">{{ r.title }}</div>
+              <small>{{ r.description || '-' }}</small>
+            </div>
+            <div>{{ r.propertyId || '-' }} / {{ r.unitId || '-' }}</div>
+            <div><span class="badge">{{ r.status }}</span></div>
+            <div>{{ r.priority || '-' }}</div>
+            <div>{{ r.updatedAt | date:'short' }}</div>
+            <div class="actions">
+              <button (click)="setTenantRequestStatus(r.id, 'in_progress')" [disabled]="r.status !== 'new'">Start</button>
+              <button (click)="setTenantRequestStatus(r.id, 'completed')" [disabled]="r.status === 'completed' || r.status === 'cancelled'">Complete</button>
+            </div>
+          </div>
+          <div class="empty" *ngIf="!requests.length">No tenant-submitted requests found.</div>
+        </div>
+      </article>
+
       <div *ngIf="showForm" class="modal-overlay" (click)="showForm = false">
         <div class="modal" (click)="$event.stopPropagation()">
           <h3>Create Maintenance Request</h3>
@@ -72,6 +101,9 @@ import { WorkOrdersService } from '../work-orders/workorders.service';
     .page { display:grid; gap:14px; }
     header h1 { margin:0; color:#f8fafc; }
     header p { margin:4px 0 0; color:#94a3b8; }
+    .tabs { display:flex; gap:6px; }
+    .tabs button { border:none; border-radius:10px 10px 0 0; padding:10px 14px; font-weight:700; cursor:pointer; background:rgba(148,163,184,.15); color:#94a3b8; }
+    .tabs button.active { background:rgba(15,23,42,.78); color:#f8fafc; }
     .card { border:1px solid rgba(148,163,184,.2); border-radius:16px; background:rgba(15,23,42,.78); padding:14px; color:#e2e8f0; }
     .filters { display:grid; grid-template-columns:1fr 180px auto; gap:8px; margin-bottom:10px; }
     input, select { width:100%; border:1px solid rgba(148,163,184,.35); background:rgba(2,6,23,.45); color:#f8fafc; border-radius:10px; padding:10px; }
@@ -86,6 +118,7 @@ import { WorkOrdersService } from '../work-orders/workorders.service';
     .badge { border-radius:999px; padding:5px 8px; background:rgba(59,130,246,.18); color:#bfdbfe; font-size:11px; text-transform:uppercase; font-weight:700; }
     .actions { display:flex; gap:6px; }
     .actions button { border:none; border-radius:10px; padding:8px 10px; font-weight:700; cursor:pointer; background:rgba(148,163,184,.2); color:#e2e8f0; }
+    .actions button:disabled { opacity:.5; cursor:not-allowed; }
     .empty { padding:14px; color:#94a3b8; }    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:1000; }
     .modal { background:#fff; border-radius:12px; padding:24px; max-width:400px; width:90%; max-height:90vh; overflow-y:auto; }
     .modal h3 { margin:0 0 16px; color:#0f172a; }
@@ -97,9 +130,12 @@ import { WorkOrdersService } from '../work-orders/workorders.service';
 })
 export class MaintenancePage implements OnInit {
   private workOrders = inject(WorkOrdersService);
+  private maintenance = inject(MaintenanceService);
   private route = inject(ActivatedRoute);
 
+  tab: 'workOrders' | 'tenantRequests' = 'workOrders';
   orders$ = this.workOrders.listOrgLatest();
+  tenantRequests$ = this.maintenance.list();
   search = '';
   statusFilter = 'all';
   showForm = false;
@@ -122,6 +158,10 @@ export class MaintenancePage implements OnInit {
 
   async setStatus(workOrderId: string, status: 'in_progress' | 'done') {
     await this.workOrders.update(workOrderId, { status });
+  }
+
+  async setTenantRequestStatus(requestId: string, status: 'in_progress' | 'completed') {
+    await this.maintenance.updateStatus(requestId, status);
   }
 
   ngOnInit() {

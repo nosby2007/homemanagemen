@@ -50,6 +50,7 @@ import { OrgContextService } from '../../core/org/org-context.service';
               <button type="button" *ngIf="tenant.authStatus === 'invited'" (click)="resendInvitation(tenant)">Resend Invitation</button>
               <button type="button" class="warn" *ngIf="tenant.authStatus === 'active'" (click)="disableAccess(tenant)">Disable Access</button>
             </div>
+            <div class="invite-error" *ngIf="inviteErrors[tenant.id]">{{ inviteErrors[tenant.id] }}</div>
           </div>
 
           <div class="empty" *ngIf="!filter(tenants).length">No tenants found.</div>
@@ -79,6 +80,7 @@ import { OrgContextService } from '../../core/org/org-context.service';
     .auth-badge.invited { background:rgba(245,158,11,.2); color:#fde68a; }
     .auth-badge.active { background:rgba(16,185,129,.2); color:#bbf7d0; }
     .auth-badge.disabled { background:rgba(239,68,68,.2); color:#fecaca; }
+    .invite-error { grid-column:1 / -1; color:#fecaca; font-size:12px; padding:2px 0 6px; }
     .empty { padding:14px; color:#94a3b8; }
     @media (max-width: 1100px) { .toolbar { grid-template-columns:1fr; } .thead, .row { grid-template-columns:1fr; } }
   `],
@@ -92,6 +94,7 @@ export class TenantsListPage {
   tenants$: Observable<Tenant[]> = this.svc.list().pipe(map((items: any) => items as Tenant[]));
   query = '';
   statusFilter: 'all' | 'active' | 'inactive' | 'lead' = 'all';
+  inviteErrors: Record<string, string> = {};
 
   filter(items: Tenant[]): Tenant[] {
     const q = this.query.trim().toLowerCase();
@@ -116,6 +119,7 @@ export class TenantsListPage {
 
   async sendInvitation(tenant: Tenant) {
     if (!tenant.id || !tenant.email) return;
+    delete this.inviteErrors[tenant.id];
     try {
       const propertyId = String((tenant as any).propertyId || (tenant as any).currentPropertyId || '').trim();
       if (!propertyId) throw new Error('Tenant must be linked to a property before invitation.');
@@ -131,20 +135,21 @@ export class TenantsListPage {
       });
       (tenant as any).authStatus = 'invited';
       (tenant as any).invitationId = result.invitationId;
-    } catch (err) {
-      console.error('Failed to send tenant invitation', err);
+    } catch (err: any) {
+      this.inviteErrors[tenant.id] = err?.message || 'Failed to send invitation.';
     }
   }
 
   async resendInvitation(tenant: Tenant) {
     if (!tenant.id) return;
+    delete this.inviteErrors[tenant.id];
     if (tenant.invitationId) {
       try {
         const result = await this.invitations.resendInvitation(tenant.invitationId);
         (tenant as any).authStatus = 'invited';
         (tenant as any).invitationId = result.invitationId;
-      } catch (err) {
-        console.error('Failed to resend tenant invitation', err);
+      } catch (err: any) {
+        this.inviteErrors[tenant.id] = err?.message || 'Failed to resend invitation.';
       }
       return;
     }

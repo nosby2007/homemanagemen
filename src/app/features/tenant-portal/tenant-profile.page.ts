@@ -1,16 +1,17 @@
 ﻿import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil, switchMap } from 'rxjs/operators';
 import { UserService } from '../../core/services/user.service';
 import { TenantDashboardService } from './tenant-dashboard.service';
-import { Tenant } from '../tenants/tenants.service';
+import { Tenant, TenantsService } from '../tenants/tenants.service';
 import { AppUser } from '../../core/models/domain.models';
 
 @Component({
   selector: 'app-tenant-profile',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="page">
       <div class="header">
@@ -25,7 +26,10 @@ import { AppUser } from '../../core/models/domain.models';
       <div class="grid" *ngIf="!loading">
         <!-- Personal Info -->
         <div class="card">
-          <h2>Personal Information</h2>
+          <div class="card-head">
+            <h2>Personal Information</h2>
+            <button type="button" class="edit-btn" *ngIf="tenantProfile && !editing" (click)="startEdit()">Edit</button>
+          </div>
           <div class="avatar-row">
             <div class="avatar">{{ initials }}</div>
             <div>
@@ -33,7 +37,8 @@ import { AppUser } from '../../core/models/domain.models';
               <div class="role-tag">Tenant</div>
             </div>
           </div>
-          <div class="info-list">
+
+          <div class="info-list" *ngIf="!editing">
             <div class="info-row">
               <span class="lbl">Email</span>
               <span>{{ userProfile?.email || '—' }}</span>
@@ -51,6 +56,24 @@ import { AppUser } from '../../core/models/domain.models';
               <span>{{ tenantProfile!.emergencyPhone }}</span>
             </div>
           </div>
+
+          <form class="edit-form" *ngIf="editing" (ngSubmit)="save()">
+            <label>Phone</label>
+            <input type="text" name="phone" [(ngModel)]="editForm.phone" placeholder="Phone number" />
+
+            <label>Emergency Contact</label>
+            <input type="text" name="emergencyContact" [(ngModel)]="editForm.emergencyContact" placeholder="Name" />
+
+            <label>Emergency Phone</label>
+            <input type="text" name="emergencyPhone" [(ngModel)]="editForm.emergencyPhone" placeholder="Phone number" />
+
+            <div class="save-error" *ngIf="saveError">{{ saveError }}</div>
+
+            <div class="edit-actions">
+              <button type="button" class="cancel-btn" (click)="cancelEdit()" [disabled]="saving">Cancel</button>
+              <button type="submit" class="save-btn" [disabled]="saving">{{ saving ? 'Saving...' : 'Save' }}</button>
+            </div>
+          </form>
         </div>
 
         <!-- Tenancy Info -->
@@ -89,7 +112,18 @@ import { AppUser } from '../../core/models/domain.models';
     @keyframes spin{to{transform:rotate(360deg)}}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
     .card{background:rgba(15,23,42,.78);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:22px}
-    .avatar-row{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+    .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+    .card-head h2{margin:0}
+    .edit-btn{border:1px solid rgba(148,163,184,.35);background:rgba(148,163,184,.12);color:#e2e8f0;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+    .edit-form{display:grid;gap:6px;margin-top:6px}
+    .edit-form label{font-size:12px;font-weight:700;color:rgba(226,232,240,.65)}
+    .edit-form input{border:1px solid rgba(148,163,184,.35);background:rgba(2,6,23,.45);color:#f8fafc;border-radius:8px;padding:9px 10px;margin-bottom:8px}
+    .edit-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+    .save-error{color:#fca5a5;font-size:12px;margin-bottom:4px}
+    .cancel-btn{border:1px solid rgba(148,163,184,.35);background:transparent;color:#e2e8f0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}
+    .save-btn{border:none;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}
+    .save-btn:disabled,.cancel-btn:disabled{opacity:.5;cursor:not-allowed}
+    .avatar-row{display:flex;align-items:center;gap:16px;margin:16px 0 20px}
     .avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:grid;place-items:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0}
     .full-name{font-size:16px;font-weight:700;color:#f8fafc}
     .role-tag{font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:600;margin-top:3px}
@@ -105,11 +139,17 @@ import { AppUser } from '../../core/models/domain.models';
 export class TenantProfilePage implements OnInit, OnDestroy {
   private userSvc = inject(UserService);
   private dashSvc = inject(TenantDashboardService);
+  private tenantsSvc = inject(TenantsService);
 
   loading = true;
   userProfile: AppUser | null = null;
   tenantProfile: Tenant | null = null;
   initials = '?';
+
+  editing = false;
+  saving = false;
+  saveError = '';
+  editForm = { phone: '', emergencyContact: '', emergencyPhone: '' };
 
   private destroy$ = new Subject<void>();
 
@@ -136,5 +176,41 @@ export class TenantProfilePage implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  startEdit() {
+    if (!this.tenantProfile) return;
+    this.editForm = {
+      phone: this.tenantProfile.phone || '',
+      emergencyContact: this.tenantProfile.emergencyContact || '',
+      emergencyPhone: this.tenantProfile.emergencyPhone || '',
+    };
+    this.saveError = '';
+    this.editing = true;
+  }
+
+  cancelEdit() {
+    this.editing = false;
+    this.saveError = '';
+  }
+
+  async save() {
+    if (!this.tenantProfile?.id) return;
+    this.saving = true;
+    this.saveError = '';
+    try {
+      const patch = {
+        phone: this.editForm.phone.trim(),
+        emergencyContact: this.editForm.emergencyContact.trim(),
+        emergencyPhone: this.editForm.emergencyPhone.trim(),
+      };
+      await this.tenantsSvc.update(this.tenantProfile.id, patch);
+      this.tenantProfile = { ...this.tenantProfile, ...patch };
+      this.editing = false;
+    } catch (err: any) {
+      this.saveError = err?.message || 'Unable to save changes. Please try again.';
+    } finally {
+      this.saving = false;
+    }
   }
 }

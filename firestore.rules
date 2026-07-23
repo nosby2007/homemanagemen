@@ -43,7 +43,7 @@ service cloud.firestore {
     function isOrgAdmin(orgId) {
       return isSuperAdmin() || (
         isOrgMember(orgId)
-        && memberRole(orgId) in ['super_admin', 'agency_admin', 'property_manager', 'admin', 'manager', 'broker']
+        && memberRole(orgId) in ['super_admin', 'agency_admin', 'property_manager', 'admin', 'manager', 'broker', 'landlord']
       );
     }
 
@@ -574,6 +574,11 @@ service cloud.firestore {
       match /reports/{reportId} {
         allow read: if isOrgMember(orgId);
         allow create, update, delete: if isOrgAdmin(orgId);
+      }
+
+      match /workOrders/{workOrderId} {
+        allow read: if isOrgMember(orgId);
+        allow create, update, delete: if isOrgAdmin(orgId) || memberRole(orgId) in ['landlord', 'maintenance', 'vendor', 'staff'];
       }
 
       match /{document=**} {

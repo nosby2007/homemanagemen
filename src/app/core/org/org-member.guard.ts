@@ -36,7 +36,7 @@ export class OrgMemberGuard implements CanActivate {
             return from(resolveOrg()).pipe(
               switchMap((resolvedOrgId) => {
                 if (!resolvedOrgId) {
-                  return of(this.router.parseUrl('/super-admin'));
+                  return of(this.router.parseUrl('/onboarding/create-org'));
                 }
 
                 const ref = doc(this.fs, `orgs/${resolvedOrgId}/members/${uid}`);
@@ -64,7 +64,7 @@ export class OrgMemberGuard implements CanActivate {
                       }
                     }
 
-                    if (!active) return this.router.parseUrl('/super-admin');
+                    if (!active) return this.router.parseUrl('/onboarding/create-org');
                     if (role === 'tenant') return this.router.parseUrl('/tenant');
                     if (role === 'landlord') return this.router.parseUrl('/landlord');
                     return true;

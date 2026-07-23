@@ -43,6 +43,16 @@ export class DocumentsService {
     return collectionData(qRef, { idField: 'id' }) as Observable<DocumentRecord[]>;
   }
 
+  listForCurrentTenant(tenantId: string): Observable<DocumentRecord[]> {
+    const qRef = query(
+      this.col(),
+      where('tenantId', '==', tenantId),
+      orderBy('createdAt', 'desc'),
+      limit(200),
+    );
+    return collectionData(qRef, { idField: 'id' }) as Observable<DocumentRecord[]>;
+  }
+
   async uploadDocument(payload: {
     title: string;
     category: DocumentCategory;

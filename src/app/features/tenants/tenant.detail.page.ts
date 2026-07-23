@@ -43,6 +43,7 @@ import { OrgContextService } from '../../core/org/org-context.service';
               <button type="button" class="warn" *ngIf="tenant.authStatus === 'active'" (click)="disableAccess(tenant)">Disable Access</button>
             </div>
           </div>
+          <div class="row" *ngIf="inviteError"><span>Invite error</span><strong class="error-text">{{ inviteError }}</strong></div>
           <div class="row"><span>Created</span><strong>{{ tenant.createdAt | date:'medium' }}</strong></div>
           <div class="row"><span>Updated</span><strong>{{ tenant.updatedAt | date:'medium' }}</strong></div>
         </article>
@@ -65,6 +66,7 @@ import { OrgContextService } from '../../core/org/org-context.service';
     .actions-row { align-items: center; }
     .inline-actions { display:flex; gap:8px; }
     .inline-actions button.warn { background: rgba(239, 68, 68, .2); color: #fecaca; }
+    .error-text { color: #fecaca; }
   `],
 })
 export class TenantDetailPage {
@@ -78,6 +80,8 @@ export class TenantDetailPage {
     switchMap((params) => this.tenants.get(params.get('tenantId') || ''))
   );
 
+  inviteError = '';
+
   async edit(tenantId: string) {
     await this.router.navigateByUrl(`/tenants/${tenantId}/edit`);
   }
@@ -88,9 +92,10 @@ export class TenantDetailPage {
 
   async sendInvitation(tenant: any) {
     if (!tenant?.id || !tenant?.email) return;
+    this.inviteError = '';
     const propertyId = String(tenant.propertyId || tenant.currentPropertyId || '').trim();
     if (!propertyId) {
-      console.error('Tenant invitation requires propertyId.');
+      this.inviteError = 'Tenant invitation requires a property.';
       return;
     }
     try {
@@ -105,20 +110,21 @@ export class TenantDetailPage {
       });
       tenant.authStatus = 'invited';
       tenant.invitationId = result.invitationId;
-    } catch (err) {
-      console.error('Failed to send tenant invitation', err);
+    } catch (err: any) {
+      this.inviteError = err?.message || 'Failed to send invitation.';
     }
   }
 
   async resendInvitation(tenant: any) {
     if (!tenant?.id) return;
+    this.inviteError = '';
     if (tenant.invitationId) {
       try {
         const result = await this.invitations.resendInvitation(String(tenant.invitationId));
         tenant.authStatus = 'invited';
         tenant.invitationId = result.invitationId;
-      } catch (err) {
-        console.error('Failed to resend tenant invitation', err);
+      } catch (err: any) {
+        this.inviteError = err?.message || 'Failed to resend invitation.';
       }
       return;
     }

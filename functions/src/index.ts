@@ -539,6 +539,11 @@ type CreateBusinessProfileData = {
   profile: Record<string, any>;
 };
 
+type CreateOrganizationData = {
+  name: string;
+  type: OrgType;
+};
+
 type CreateInvitationData = {
   orgId: string;
   propertyId: string;
@@ -581,6 +586,13 @@ const ORG_ADMIN_ROLES = new Set<MemberRole>([
   'admin',
   'manager',
 ]);
+
+const ORG_TYPE_TO_ADMIN_ROLE: Record<OrgType, MemberRole> = {
+  agency: 'agency_admin',
+  brokerage: 'broker',
+  property_manager: 'property_manager',
+  landlord: 'landlord',
+};
 
 const ALLOWED_INVITE_ROLES = new Set<MemberRole>([
   'agency_admin',
@@ -931,6 +943,53 @@ export const createBusinessProfile = onCall<CreateBusinessProfileData>(async (re
   return { id, orgId, targetType, authStatus: 'not_invited' };
 });
 
+export const createOrganization = onCall<CreateOrganizationData>(async (request) => {
+  const uid = requireAuth(request);
+  const data = request.data || ({} as CreateOrganizationData);
+  const name = String(data.name || '').trim();
+  const type = String(data.type || '').trim() as OrgType;
+
+  if (!name) throw new HttpsError('invalid-argument', 'Organization name is required.');
+  const role = ORG_TYPE_TO_ADMIN_ROLE[type];
+  if (!role) throw new HttpsError('invalid-argument', 'Invalid organization type.');
+
+  const db = admin.firestore();
+  const orgId = db.collection('_').doc().id;
+  const now = nowMs();
+
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const email = normalizeEmail(String((userSnap.data() as any)?.email || request.auth?.token?.email || ''));
+
+  const orgPayload = { id: orgId, name, type, status: 'active', ownerUid: uid, createdAt: now, updatedAt: now };
+  await db.doc(`organizations/${orgId}`).set(orgPayload, { merge: true });
+  await db.doc(`orgs/${orgId}`).set(orgPayload, { merge: true });
+
+  const membershipPayload = {
+    id: `${orgId}_${uid}`,
+    orgId,
+    userId: uid,
+    email,
+    role,
+    status: 'active',
+    invitedBy: uid,
+    joinedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.doc(`organizationMembers/${orgId}_${uid}`).set(membershipPayload, { merge: true });
+  await db.doc(`orgs/${orgId}/members/${uid}`).set(membershipPayload, { merge: true });
+
+  await db.doc(`users/${uid}`).set(
+    { role, activeOrgId: orgId, defaultOrgId: orgId, lastOrgId: orgId, updatedAt: now },
+    { merge: true }
+  );
+
+  await writeActivity(orgId, uid, 'create_organization', 'organizations', orgId, `Created organization "${name}"`);
+  await writeNotification(orgId, uid, 'Welcome', `Your organization "${name}" is ready.`, 'success');
+
+  return { orgId, role, redirect: roleRedirect(role) };
+});
+
 export const createInvitation = onCall<CreateInvitationData>(
   { secrets: ['SENDGRID_API_KEY', 'SENDGRID_FROM_EMAIL', 'SENDGRID_EU_RESIDENCY', 'INVITE_BASE_URL'] },
   async (request) => {
@@ -950,6 +1009,9 @@ export const createInvitation = onCall<CreateInvitationData>(
   }
   if (!ALLOWED_INVITE_ROLES.has(role)) {
     throw new HttpsError('invalid-argument', `Role ${role} is not allowed for invitation.`);
+  }
+  if (targetType === 'tenant' && !unitId) {
+    throw new HttpsError('invalid-argument', 'A unit is required to invite a tenant.');
   }
 
   await assertOrgManager(uid, orgId);

@@ -155,8 +155,7 @@ export class TenantPaymentPage implements OnInit, OnDestroy {
       const amount = Number(this.form.value.amount || 0);
       await this.payments.create(this.propertyId, this.leaseId, {
         amount,
-        status: 'paid',
-        paidAt: Date.now(),
+        status: 'pending',
         dueDate: Date.now(),
         method: String(this.form.value.method || 'card'),
         reference: String(this.form.value.reference || ''),
@@ -165,7 +164,7 @@ export class TenantPaymentPage implements OnInit, OnDestroy {
         unitId: this.unitId,
       });
 
-      this.success = 'Payment submitted successfully.';
+      this.success = 'Payment submitted — pending verification.';
       this.form.patchValue({ reference: '', notes: '' });
     } catch {
       this.submitError = 'Payment submission failed. Please try again.';

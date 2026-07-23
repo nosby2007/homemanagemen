@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Auth } from '@angular/fire/auth';
 import { DocumentsService } from '../documents/documents.service';
 import { TenantDashboardService } from './tenant-dashboard.service';
 
@@ -257,7 +256,6 @@ export class TenantDocumentPage implements OnInit {
   private tenantProfileId: string | null = null;
 
   constructor(
-    private auth: Auth,
     private docsSvc: DocumentsService,
     private tenantDashboard: TenantDashboardService,
   ) {}
@@ -268,20 +266,19 @@ export class TenantDocumentPage implements OnInit {
 
   loadDocuments() {
     this.loading = true;
-    const uid = this.auth.currentUser?.uid || null;
 
     this.tenantDashboard.getTenantProfile().subscribe({
       next: (tenant) => {
         this.tenantProfileId = tenant?.id || null;
-        this.docsSvc.list().subscribe({
-          next: (rows: any[]) => {
-            const filtered = rows.filter((d) => {
-              const byTenantDoc = this.tenantProfileId && d.tenantId === this.tenantProfileId;
-              const byUploader = uid && d.createdBy === uid;
-              return byTenantDoc || byUploader;
-            });
+        if (!this.tenantProfileId) {
+          this.documents = [];
+          this.loading = false;
+          return;
+        }
 
-            this.documents = filtered.map((d) => ({
+        this.docsSvc.listForCurrentTenant(this.tenantProfileId).subscribe({
+          next: (rows: any[]) => {
+            this.documents = rows.map((d) => ({
               id: d.id,
               name: d.title || d.fileName || 'Document',
               type: (d.contentType || 'file').toString().split('/')[1]?.toUpperCase() || 'FILE',

@@ -15,6 +15,7 @@ export const routes: Routes = [
   { path: 'forgot-password', canActivate: [PublicOnlyGuard], loadComponent: () => import('./core/auth/forgot-password.page').then(m => m.ForgotPasswordPage) },
   { path: 'reset-password', canActivate: [PublicOnlyGuard], loadComponent: () => import('./core/auth/reset-password.page').then(m => m.ResetPasswordPage) },
   { path: 'accept-invite', canActivate: [PublicOnlyGuard], loadComponent: () => import('./features/invitations/accept-invite.page').then(m => m.AcceptInvitePage) },
+  { path: 'onboarding/create-org', canActivate: [AuthGuard], loadComponent: () => import('./features/onboarding/create-org.page').then(m => m.CreateOrgPage) },
   { path: 'forbidden', loadComponent: () => import('./features/shared/forbidden.page').then(m => m.ForbiddenPage) },
 
   // ✅ Super admin MUST be outside OrgMemberGuard shell
@@ -148,16 +149,16 @@ export const routes: Routes = [
       { path: 'tenants/:tenantId/edit', data: { roles: [...LANDLORD_ROLES] }, loadComponent: () => import('./features/tenants/tenant.form.page').then(m => m.TenantFormPage) },
 
       // Payments
-      { path: 'payments', data: { roles: [...LANDLORD_ROLES, 'tenant'] }, loadComponent: () => import('./features/payments/payments.list.page').then(m => m.PaymentsListPage) },
+      { path: 'payments', data: { roles: [...LANDLORD_ROLES] }, loadComponent: () => import('./features/payments/payments.list.page').then(m => m.PaymentsListPage) },
       {
         path: 'properties/:propertyId/leases/:leaseId/payments/new',
-        data: { roles: [...LANDLORD_ROLES, 'tenant'] },
+        data: { roles: [...LANDLORD_ROLES] },
         loadComponent: () => import('./features/payments/add-payment.page').then(m => m.AddPaymentPage),
       },
 
       // Maintenance / Documents / Reports
       { path: 'maintenance', data: { roles: [...MAINTENANCE_ROLES, 'landlord'] }, loadComponent: () => import('./features/maintenance/maintenance.page').then(m => m.MaintenancePage) },
-      { path: 'documents', data: { roles: [...LANDLORD_ROLES, ...SALES_ROLES, 'tenant', 'vendor', 'staff', 'maintenance'] }, loadComponent: () => import('./features/documents/documents.page').then(m => m.DocumentsPage) },
+      { path: 'documents', data: { roles: [...LANDLORD_ROLES, ...SALES_ROLES, 'vendor', 'staff', 'maintenance'] }, loadComponent: () => import('./features/documents/documents.page').then(m => m.DocumentsPage) },
       { path: 'reports', data: { roles: [...PLATFORM_ADMIN_ROLES, 'broker', 'landlord'] }, loadComponent: () => import('./features/reports/reports.builder.page').then(m => m.ReportsBuilderPage) },
 
       // Profile / settings

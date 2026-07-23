@@ -68,7 +68,7 @@ export class AuthService {
 
   async register(payload: RegisterPayload): Promise<string> {
     const normalizedEmail = payload.email.trim().toLowerCase();
-    const role = payload.role ?? 'tenant';
+    const role = payload.role;
     const cred = await createUserWithEmailAndPassword(this.auth, normalizedEmail, payload.password);
     try {
       await this.bootstrapUserDoc(cred.user.uid, normalizedEmail, true, payload.fullName, role);
@@ -128,19 +128,15 @@ export class AuthService {
         } as any);
       }
 
+      // No resolved organization membership yet -> send the user to create/claim one.
+      if (!lastOrgId) return '/onboarding/create-org';
+
       // Role-based portal redirect (orgId is now set above)
-      if (role === 'tenant') return lastOrgId ? '/tenant' : '/super-admin';
-      if (role === 'landlord') return lastOrgId ? '/landlord' : '/super-admin';
+      if (role === 'tenant') return '/tenant';
+      if (role === 'landlord') return '/landlord';
 
-      // All workspace roles enter the main app shell when org membership exists.
-      if (lastOrgId) return roleHomePath(role || 'admin');
-
-      // Platform/admin roles may still access super-admin workspace to manage org mappings.
-      if (role && ['agency_admin', 'property_manager', 'broker', 'admin', 'manager', 'agent', 'staff', 'vendor', 'maintenance', 'buyer', 'seller', 'client'].includes(role)) {
-        return '/super-admin';
-      }
-
-      throw new Error('No active organization membership found. Ask an administrator to add you to an organization.');
+      // All other workspace roles enter the main app shell.
+      return roleHomePath(role || 'admin');
     } catch (error) {
       // Avoid surfacing transient Firestore permission glitches in the login card.
       if (this.isPermissionDenied(error)) {
@@ -171,7 +167,7 @@ export class AuthService {
           displayName: fullName ?? '',
           fullName: fullName ?? '',
           phone: '',
-          role: role ?? 'tenant',
+          role: role ?? '',
           globalRole: 'user',
           status: 'active',
           agencyId: '',

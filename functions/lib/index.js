@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.switchOrganization = exports.acceptInvitation = exports.validateInvitation = exports.revokeInvitation = exports.remindPendingInvitations = exports.resendInvitation = exports.createInvitation = exports.createBusinessProfile = exports.hello = exports.generateReportPdf = void 0;
+exports.switchOrganization = exports.acceptInvitation = exports.validateInvitation = exports.revokeInvitation = exports.remindPendingInvitations = exports.resendInvitation = exports.createInvitation = exports.createOrganization = exports.createBusinessProfile = exports.hello = exports.generateReportPdf = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -463,6 +463,12 @@ const ORG_ADMIN_ROLES = new Set([
     'admin',
     'manager',
 ]);
+const ORG_TYPE_TO_ADMIN_ROLE = {
+    agency: 'agency_admin',
+    brokerage: 'broker',
+    property_manager: 'property_manager',
+    landlord: 'landlord',
+};
 const ALLOWED_INVITE_ROLES = new Set([
     'agency_admin',
     'broker',
@@ -760,6 +766,43 @@ exports.createBusinessProfile = (0, https_1.onCall)(async (request) => {
     await db.doc(`orgs/${orgId}/${coll}/${id}`).set(payload, { merge: true });
     await writeActivity(orgId, uid, 'create_business_profile', coll, id, `Created ${targetType} profile`);
     return { id, orgId, targetType, authStatus: 'not_invited' };
+});
+exports.createOrganization = (0, https_1.onCall)(async (request) => {
+    const uid = requireAuth(request);
+    const data = request.data || {};
+    const name = String(data.name || '').trim();
+    const type = String(data.type || '').trim();
+    if (!name)
+        throw new https_1.HttpsError('invalid-argument', 'Organization name is required.');
+    const role = ORG_TYPE_TO_ADMIN_ROLE[type];
+    if (!role)
+        throw new https_1.HttpsError('invalid-argument', 'Invalid organization type.');
+    const db = admin.firestore();
+    const orgId = db.collection('_').doc().id;
+    const now = nowMs();
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const email = normalizeEmail(String(userSnap.data()?.email || request.auth?.token?.email || ''));
+    const orgPayload = { id: orgId, name, type, status: 'active', ownerUid: uid, createdAt: now, updatedAt: now };
+    await db.doc(`organizations/${orgId}`).set(orgPayload, { merge: true });
+    await db.doc(`orgs/${orgId}`).set(orgPayload, { merge: true });
+    const membershipPayload = {
+        id: `${orgId}_${uid}`,
+        orgId,
+        userId: uid,
+        email,
+        role,
+        status: 'active',
+        invitedBy: uid,
+        joinedAt: now,
+        createdAt: now,
+        updatedAt: now,
+    };
+    await db.doc(`organizationMembers/${orgId}_${uid}`).set(membershipPayload, { merge: true });
+    await db.doc(`orgs/${orgId}/members/${uid}`).set(membershipPayload, { merge: true });
+    await db.doc(`users/${uid}`).set({ role, activeOrgId: orgId, defaultOrgId: orgId, lastOrgId: orgId, updatedAt: now }, { merge: true });
+    await writeActivity(orgId, uid, 'create_organization', 'organizations', orgId, `Created organization "${name}"`);
+    await writeNotification(orgId, uid, 'Welcome', `Your organization "${name}" is ready.`, 'success');
+    return { orgId, role, redirect: roleRedirect(role) };
 });
 exports.createInvitation = (0, https_1.onCall)({ secrets: ['SENDGRID_API_KEY', 'SENDGRID_FROM_EMAIL', 'SENDGRID_EU_RESIDENCY', 'INVITE_BASE_URL'] }, async (request) => {
     const uid = requireAuth(request);

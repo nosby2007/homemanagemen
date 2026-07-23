@@ -1,12 +1,15 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { AuthService } from './auth.service';
+import { Router } from '@angular/router';
+import { Auth } from '@angular/fire/auth';
+import { AuthService } from '../../core/auth/auth.service';
+import { OrganizationService } from '../../core/services/organization.service';
+import { OrganizationType } from '../../core/models/domain.models';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="auth-shell">
       <div class="bg-mesh"></div>
@@ -14,51 +17,35 @@ import { AuthService } from './auth.service';
       <section class="auth-card">
         <header class="auth-head">
           <div class="eyebrow">PropertyFlow Pro</div>
-          <h1>Create your account</h1>
-          <p>Next you'll set up your organization's workspace.</p>
+          <h1>Create your organization</h1>
+          <p>You'll be the owner and admin of this workspace.</p>
         </header>
 
         <form [formGroup]="form" (ngSubmit)="submit()" class="form">
-          <label>Full name <span>*</span></label>
-          <input type="text" formControlName="fullName" placeholder="e.g. Alex Morgan" />
-          <small class="field-error" *ngIf="form.controls.fullName.touched && form.controls.fullName.invalid">
-            Full name is required.
+          <label>Organization name <span>*</span></label>
+          <input type="text" formControlName="name" placeholder="e.g. Riverside Realty" />
+          <small class="field-error" *ngIf="form.controls.name.touched && form.controls.name.invalid">
+            Organization name is required.
           </small>
 
-          <label>Email address <span>*</span></label>
-          <input type="email" formControlName="email" placeholder="you@company.com" />
-          <small class="field-error" *ngIf="form.controls.email.touched && form.controls.email.invalid">
-            Enter a valid email address.
-          </small>
-
-          <label>Password <span>*</span></label>
-          <div class="password-wrap">
-            <input [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="Minimum 8 characters" />
-            <button type="button" class="toggle" (click)="showPassword = !showPassword">
-              {{ showPassword ? 'Hide' : 'Show' }}
-            </button>
-          </div>
-          <small class="field-error" *ngIf="form.controls.password.touched && form.controls.password.invalid">
-            Password must be at least 8 characters.
-          </small>
-
-          <label>Confirm password <span>*</span></label>
-          <input [type]="showPassword ? 'text' : 'password'" formControlName="confirmPassword" placeholder="Repeat your password" />
-          <small class="field-error" *ngIf="form.touched && form.errors?.['passwordMismatch']">
-            Passwords do not match.
-          </small>
+          <label>Organization type <span>*</span></label>
+          <select formControlName="type">
+            <option value="agency">Real Estate Agency</option>
+            <option value="brokerage">Brokerage Firm</option>
+            <option value="property_manager">Property Management Company</option>
+            <option value="landlord">Landlord / Property Owner</option>
+          </select>
 
           <button class="cta" type="submit" [disabled]="loading">
-            {{ loading ? 'Creating account...' : 'Create account' }}
+            {{ loading ? 'Creating organization...' : 'Create organization' }}
           </button>
 
-          <div class="feedback ok" *ngIf="successMessage">{{ successMessage }}</div>
           <div class="feedback err" *ngIf="errorMessage">{{ errorMessage }}</div>
         </form>
 
         <footer class="auth-foot">
-          Already have an account?
-          <a routerLink="/login">Sign in</a>
+          Wrong account?
+          <a href="javascript:void(0)" (click)="signOut()">Sign out</a>
         </footer>
       </section>
     </div>
@@ -112,17 +99,6 @@ import { AuthService } from './auth.service';
       outline: none;
     }
     input:focus, select:focus { border-color: #0f4c81; box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.14); }
-    .password-wrap { display: flex; align-items: center; gap: 8px; }
-    .toggle {
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #0f4c81;
-      border-radius: 10px;
-      padding: 10px 12px;
-      cursor: pointer;
-      font-weight: 700;
-      white-space: nowrap;
-    }
     .cta {
       margin-top: 12px;
       border: none;
@@ -138,41 +114,28 @@ import { AuthService } from './auth.service';
     .cta:disabled { opacity: 0.6; cursor: not-allowed; }
     .field-error { color: #fda4af; font-size: 0.77rem; margin-bottom: 4px; }
     .feedback { margin-top: 8px; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; }
-    .feedback.ok { background: #ecfdf5; border: 1px solid #bbf7d0; color: #166534; }
     .feedback.err { background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; }
     .auth-foot { margin-top: 18px; color: #64748b; text-align: center; font-size: 0.9rem; }
     .auth-foot a { color: #0f4c81; font-weight: 700; text-decoration: none; }
   `],
 })
-export class RegisterPage {
+export class CreateOrgPage {
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private authFire = inject(Auth);
   private auth = inject(AuthService);
+  private orgService = inject(OrganizationService);
 
   loading = false;
-  showPassword = false;
   errorMessage = '';
-  successMessage = '';
 
-  form = this.fb.group(
-    {
-      fullName: ['', [Validators.required]],
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(8)]],
-      confirmPassword: ['', [Validators.required]],
-    },
-    {
-      validators: (group) => {
-        const password = group.get('password')?.value;
-        const confirmPassword = group.get('confirmPassword')?.value;
-        return password === confirmPassword ? null : { passwordMismatch: true };
-      },
-    }
-  );
+  form = this.fb.group({
+    name: ['', [Validators.required]],
+    type: ['agency' as OrganizationType, [Validators.required]],
+  });
 
   async submit() {
     this.errorMessage = '';
-    this.successMessage = '';
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -181,17 +144,23 @@ export class RegisterPage {
     this.loading = true;
     try {
       const value = this.form.getRawValue();
-      const route = await this.auth.register({
-        fullName: value.fullName ?? '',
-        email: value.email ?? '',
-        password: value.password ?? '',
+      await this.orgService.createOrganization({
+        name: value.name ?? '',
+        type: (value.type ?? 'agency') as OrganizationType,
       });
-      this.successMessage = 'Account created successfully. Redirecting...';
+
+      const uid = this.authFire.currentUser?.uid;
+      const route = uid ? await this.auth.resolvePostLoginRoute(uid) : '/dashboard';
       await this.router.navigateByUrl(route);
     } catch (e: any) {
-      this.errorMessage = e?.message ?? 'Registration failed. Please try again.';
+      this.errorMessage = e?.message ?? 'Unable to create organization. Please try again.';
     } finally {
       this.loading = false;
     }
+  }
+
+  async signOut() {
+    await this.auth.logout();
+    await this.router.navigateByUrl('/login');
   }
 }

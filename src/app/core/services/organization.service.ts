@@ -46,6 +46,14 @@ export class OrganizationService {
     return result?.data as { orgId: string; role: string; redirect: string };
   }
 
+  async createOrganization(payload: { name: string; type: 'agency' | 'landlord' | 'property_manager' | 'brokerage' }) {
+    const call = httpsCallable(this.fn, 'createOrganization');
+    const result: any = await call(payload);
+    const data = result?.data as { orgId: string; role: string; redirect: string };
+    this.orgContext.setOrgId(data.orgId);
+    return data;
+  }
+
   createProperty(orgId: string, data: any) {
     return this.properties.createProperty(orgId, data);
   }
