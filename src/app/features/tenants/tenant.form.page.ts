@@ -26,15 +26,30 @@ import { UnitsService } from '../units/units.service';
             <option value="">Select property</option>
             <option *ngFor="let p of properties" [value]="p.id">{{ p.name || p.id }}</option>
           </select>
+          <small class="field-error" *ngIf="form.controls.currentPropertyId.touched && form.controls.currentPropertyId.invalid">
+            Property is required.
+          </small>
+
           <select formControlName="currentUnitId">
             <option value="">Select unit</option>
             <option *ngFor="let u of units" [value]="u.id">{{ u.unitNumber }} ({{ u.status }})</option>
           </select>
+          <small class="field-error" *ngIf="form.controls.currentPropertyId.value && !units.length">
+            This property has no units yet. Add one on the Units page first.
+          </small>
+          <small class="field-error" *ngIf="form.controls.currentUnitId.touched && form.controls.currentUnitId.invalid && units.length">
+            Unit is required.
+          </small>
+
           <select formControlName="status">
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="lead">Lead</option>
           </select>
+
+          <div class="feedback err" *ngIf="submitAttempted && form.invalid">
+            Please fill in all required fields above before saving.
+          </div>
 
           <div class="actions">
             <button type="submit" [disabled]="saving">{{ saving ? 'Saving...' : (tenantId ? 'Save changes' : 'Create tenant') }}</button>
@@ -54,6 +69,7 @@ import { UnitsService } from '../units/units.service';
     .card { border:1px solid rgba(148,163,184,.2); border-radius:16px; background:rgba(15,23,42,.78); color:#e2e8f0; padding:14px; max-width:560px; }
     .form { display:grid; gap:8px; }
     input, select { width:100%; border:1px solid rgba(148,163,184,.35); background:rgba(2,6,23,.45); color:#f8fafc; border-radius:10px; padding:10px; }
+    .field-error { color:#fca5a5; font-size:12px; margin-top:-4px; }
     .actions { display:flex; gap:8px; margin-top:8px; }
     button { border:none; border-radius:10px; padding:10px 12px; font-weight:700; cursor:pointer; background:linear-gradient(125deg,#0ea5e9,#0284c7); color:#fff; }
     .ghost { background:rgba(148,163,184,.2); color:#e2e8f0; }
@@ -72,6 +88,7 @@ export class TenantFormPage {
 
   tenantId = this.route.snapshot.paramMap.get('tenantId');
   saving = false;
+  submitAttempted = false;
   successMessage = '';
   errorMessage = '';
   properties: any[] = [];
@@ -122,6 +139,7 @@ export class TenantFormPage {
   async submit() {
     this.successMessage = '';
     this.errorMessage = '';
+    this.submitAttempted = true;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
