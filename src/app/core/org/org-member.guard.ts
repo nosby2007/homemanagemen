@@ -65,6 +65,16 @@ export class OrgMemberGuard implements CanActivate {
                     }
 
                     if (!active) return this.router.parseUrl('/onboarding/create-org');
+
+                    try {
+                      const orgSnap = await getDoc(doc(this.fs, `organizations/${resolvedOrgId}`));
+                      if (orgSnap.exists() && (orgSnap.data() as any)?.status === 'disabled') {
+                        return this.router.parseUrl('/forbidden');
+                      }
+                    } catch {
+                      // Org-status check is best-effort; a permission error here shouldn't block a legitimately active member.
+                    }
+
                     if (role === 'tenant') return this.router.parseUrl('/tenant');
                     if (role === 'landlord') return this.router.parseUrl('/landlord');
                     return true;

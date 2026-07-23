@@ -89,6 +89,8 @@ export interface AppUser {
   lastLoginAt?: number;
   createdAt?: number;
   updatedAt?: number;
+  emailNotifications?: boolean;
+  smsNotifications?: boolean;
 }
 
 export interface AuthLinkableProfile {

@@ -2,7 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { TenantsService } from '../tenants/tenants.service';
+import { PropertiesService } from '../properties/properties.service';
+import { UnitsService } from '../units/units.service';
 
 @Component({
   selector: 'app-landlord-tenant',
@@ -45,18 +48,26 @@ import { TenantsService } from '../tenants/tenants.service';
             </div>
             <div class="form-group">
               <label>Property</label>
-              <input type="text" [(ngModel)]="newTenant.property" name="property" required />
+              <select [(ngModel)]="newTenant.propertyId" name="propertyId" required (ngModelChange)="onAddPropertyChange()">
+                <option value="" disabled>Select property</option>
+                <option *ngFor="let p of properties" [value]="p.id">{{ p.name || p.id }}</option>
+              </select>
             </div>
             <div class="form-group">
-              <label>Unit ID</label>
-              <input type="text" [(ngModel)]="newTenant.unitId" name="unitId" required />
+              <label>Unit</label>
+              <select [(ngModel)]="newTenant.unitId" name="unitId" required [disabled]="!newTenant.propertyId">
+                <option value="" disabled>Select unit</option>
+                <option *ngFor="let u of addUnits" [value]="u.id">{{ u.unitNumber || u.id }}</option>
+              </select>
+              <small *ngIf="newTenant.propertyId && !addUnits.length">This property has no units yet. Add one on the Units page first.</small>
             </div>
             <div class="form-group">
               <label>Lease End Date</label>
               <input type="date" [(ngModel)]="newTenant.leaseEndDate" name="leaseEndDate" required />
             </div>
+            <div class="form-error" *ngIf="addError">{{ addError }}</div>
             <div class="dialog-actions">
-              <button class="btn primary" type="submit" [disabled]="addTenantForm.invalid">Add</button>
+              <button class="btn primary" type="submit" [disabled]="addTenantForm.invalid || addSaving">{{ addSaving ? 'Adding...' : 'Add' }}</button>
               <button class="btn" type="button" (click)="closeAddTenantDialog()">Cancel</button>
             </div>
           </form>
@@ -99,14 +110,26 @@ import { TenantsService } from '../tenants/tenants.service';
             </div>
             <div class="form-group">
               <label>Property</label>
-              <input type="text" [(ngModel)]="editTenantData.property" name="editProperty" required />
+              <select [(ngModel)]="editTenantData.propertyId" name="editPropertyId" required (ngModelChange)="onEditPropertyChange()">
+                <option value="" disabled>Select property</option>
+                <option *ngFor="let p of properties" [value]="p.id">{{ p.name || p.id }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Unit</label>
+              <select [(ngModel)]="editTenantData.unitId" name="editUnitId" required [disabled]="!editTenantData.propertyId">
+                <option value="" disabled>Select unit</option>
+                <option *ngFor="let u of editUnits" [value]="u.id">{{ u.unitNumber || u.id }}</option>
+              </select>
+              <small *ngIf="editTenantData.propertyId && !editUnits.length">This property has no units yet. Add one on the Units page first.</small>
             </div>
             <div class="form-group">
               <label>Lease End Date</label>
               <input type="date" [(ngModel)]="editTenantData.leaseEndDate" name="editLeaseEndDate" required />
             </div>
+            <div class="form-error" *ngIf="editError">{{ editError }}</div>
             <div class="dialog-actions">
-              <button class="btn primary" type="submit" [disabled]="editTenantForm.invalid">Save</button>
+              <button class="btn primary" type="submit" [disabled]="editTenantForm.invalid || editSaving">{{ editSaving ? 'Saving...' : 'Save' }}</button>
               <button class="btn" type="button" (click)="closeEditTenantDialog()">Cancel</button>
             </div>
           </form>
@@ -118,19 +141,21 @@ import { TenantsService } from '../tenants/tenants.service';
         <div class="dialog delete-tenant-dialog">
           <h2>Delete Tenant</h2>
           <p>Are you sure you want to delete <strong>{{ selectedTenant?.name }}</strong>?</p>
+          <div class="form-error" *ngIf="deleteError">{{ deleteError }}</div>
           <div class="dialog-actions">
-            <button class="btn danger" (click)="confirmDeleteTenant()">Delete</button>
+            <button class="btn danger" (click)="confirmDeleteTenant()" [disabled]="deleteSaving">{{ deleteSaving ? 'Deleting...' : 'Delete' }}</button>
             <button class="btn" (click)="closeDeleteTenantDialog()">Cancel</button>
           </div>
         </div>
       </div>
 
       <div class="content">
+        <div *ngIf="!isLoading && error" class="page-error">{{ error }}</div>
         <div *ngIf="isLoading" class="loading">Loading tenants...</div>
         
         <div *ngIf="!isLoading && filteredTenants.length === 0" class="empty-state">
           <p>No tenants found.</p>
-          <button class="btn primary" (click)="addTenant()">Add Your First Tenant</button>
+          <button class="btn primary" (click)="showAddTenantDialog = true">Add Your First Tenant</button>
         </div>
 
         <div *ngIf="!isLoading && filteredTenants.length > 0" class="tenant-grid">
@@ -186,11 +211,24 @@ import { TenantsService } from '../tenants/tenants.service';
       font-size: 14px;
       color: #444;
     }
-    .form-group input {
+    .form-group input, .form-group select {
       padding: 10px 12px;
       border: 1px solid #ddd;
       border-radius: 6px;
       font-size: 14px;
+    }
+    .form-group small {
+      color: #b91c1c;
+      font-size: 12px;
+    }
+    .form-error, .page-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 12px;
     }
     .dialog-actions {
       display: flex;
@@ -351,31 +389,79 @@ export class LandlordTenantPage implements OnInit {
   filteredTenants: any[] = [];
   searchTerm: string = '';
   isLoading: boolean = false;
+  error: string = '';
   showAddTenantDialog: boolean = false;
   showViewTenantDialog: boolean = false;
   showEditTenantDialog: boolean = false;
   showDeleteTenantDialog: boolean = false;
   selectedTenant: any = null;
   editTenantData: any = null;
+
+  properties: any[] = [];
+  addUnits: any[] = [];
+  editUnits: any[] = [];
+
+  addError = '';
+  addSaving = false;
+  editError = '';
+  editSaving = false;
+  deleteError = '';
+  deleteSaving = false;
+
   newTenant: any = {
     name: '',
     email: '',
     phone: '',
-    property: '',
+    propertyId: '',
+    unitId: '',
     leaseEndDate: ''
   };
 
   constructor(
     private router: Router,
     private tenantsSvc: TenantsService,
+    private propertiesSvc: PropertiesService,
+    private unitsSvc: UnitsService,
   ) {}
 
   ngOnInit() {
     this.loadTenants();
+    this.loadProperties();
+  }
+
+  private async loadProperties() {
+    try {
+      this.properties = await firstValueFrom(this.propertiesSvc.list());
+    } catch {
+      this.properties = [];
+    }
+  }
+
+  async onAddPropertyChange() {
+    this.newTenant.unitId = '';
+    this.addUnits = [];
+    if (!this.newTenant.propertyId) return;
+    try {
+      this.addUnits = await firstValueFrom(this.unitsSvc.listByProperty(this.newTenant.propertyId));
+    } catch {
+      this.addUnits = [];
+    }
+  }
+
+  async onEditPropertyChange() {
+    this.editTenantData.unitId = '';
+    this.editUnits = [];
+    if (!this.editTenantData.propertyId) return;
+    try {
+      this.editUnits = await firstValueFrom(this.unitsSvc.listByProperty(this.editTenantData.propertyId));
+    } catch {
+      this.editUnits = [];
+    }
   }
 
   loadTenants() {
     this.isLoading = true;
+    this.error = '';
     this.tenantsSvc.list().subscribe({
       next: (rows: any[]) => {
         this.tenants = rows.map((row) => ({
@@ -387,9 +473,10 @@ export class LandlordTenantPage implements OnInit {
         this.filteredTenants = [...this.tenants];
         this.isLoading = false;
       },
-      error: () => {
+      error: (err: any) => {
         this.tenants = [];
         this.filteredTenants = [];
+        this.error = err?.message || 'Unable to load tenants.';
         this.isLoading = false;
       }
     });
@@ -423,21 +510,30 @@ export class LandlordTenantPage implements OnInit {
 
   closeAddTenantDialog() {
     this.showAddTenantDialog = false;
+    this.addError = '';
     this.resetNewTenant();
   }
 
   async submitAddTenant() {
-    // Add new tenant to the list
-    await this.tenantsSvc.create({
-      displayName: this.newTenant.name,
-      email: this.newTenant.email,
-      phone: this.newTenant.phone,
-      currentPropertyId: this.newTenant.property,
-      currentUnitId: this.newTenant.unitId,
-      status: 'active',
-    });
-    this.closeAddTenantDialog();
-    this.loadTenants();
+    this.addError = '';
+    this.addSaving = true;
+    try {
+      await this.tenantsSvc.create({
+        displayName: this.newTenant.name,
+        email: this.newTenant.email,
+        phone: this.newTenant.phone,
+        currentPropertyId: this.newTenant.propertyId,
+        currentUnitId: this.newTenant.unitId,
+        leaseEndDate: this.dateInputToMs(this.newTenant.leaseEndDate),
+        status: 'active',
+      });
+      this.closeAddTenantDialog();
+      this.loadTenants();
+    } catch (err: any) {
+      this.addError = err?.message || 'Failed to add tenant.';
+    } finally {
+      this.addSaving = false;
+    }
   }
 
   resetNewTenant() {
@@ -445,38 +541,61 @@ export class LandlordTenantPage implements OnInit {
       name: '',
       email: '',
       phone: '',
-      property: '',
+      propertyId: '',
       unitId: '',
       leaseEndDate: ''
     };
+    this.addUnits = [];
   }
 
 
-  editTenant(tenant: any) {
+  async editTenant(tenant: any) {
     this.selectedTenant = tenant;
+    this.editError = '';
     this.editTenantData = {
       ...tenant,
+      propertyId: tenant.currentPropertyId || '',
+      unitId: tenant.currentUnitId || '',
       leaseEndDate: tenant.leaseEndDate ? this.formatDateForInput(tenant.leaseEndDate) : ''
     };
+    this.editUnits = [];
+    if (this.editTenantData.propertyId) {
+      try {
+        this.editUnits = await firstValueFrom(this.unitsSvc.listByProperty(this.editTenantData.propertyId));
+      } catch {
+        this.editUnits = [];
+      }
+    }
     this.showEditTenantDialog = true;
   }
 
   closeEditTenantDialog() {
     this.showEditTenantDialog = false;
+    this.editError = '';
     this.editTenantData = null;
     this.selectedTenant = null;
   }
 
   async submitEditTenant() {
     if (!this.selectedTenant) return;
-    await this.tenantsSvc.update(this.selectedTenant.id, {
-      displayName: this.editTenantData.name,
-      email: this.editTenantData.email,
-      phone: this.editTenantData.phone,
-      currentPropertyId: this.editTenantData.property,
-    });
-    this.loadTenants();
-    this.closeEditTenantDialog();
+    this.editError = '';
+    this.editSaving = true;
+    try {
+      await this.tenantsSvc.update(this.selectedTenant.id, {
+        displayName: this.editTenantData.name,
+        email: this.editTenantData.email,
+        phone: this.editTenantData.phone,
+        currentPropertyId: this.editTenantData.propertyId,
+        currentUnitId: this.editTenantData.unitId,
+        leaseEndDate: this.dateInputToMs(this.editTenantData.leaseEndDate),
+      });
+      this.loadTenants();
+      this.closeEditTenantDialog();
+    } catch (err: any) {
+      this.editError = err?.message || 'Failed to save tenant.';
+    } finally {
+      this.editSaving = false;
+    }
   }
 
   formatDateForInput(date: any): string {
@@ -485,22 +604,37 @@ export class LandlordTenantPage implements OnInit {
     return d.toISOString().substring(0, 10);
   }
 
+  private dateInputToMs(value: string): number | undefined {
+    if (!value) return undefined;
+    return new Date(value + 'T00:00:00').getTime();
+  }
+
 
   deleteTenant(tenant: any) {
     this.selectedTenant = tenant;
+    this.deleteError = '';
     this.showDeleteTenantDialog = true;
   }
 
   closeDeleteTenantDialog() {
     this.showDeleteTenantDialog = false;
+    this.deleteError = '';
     this.selectedTenant = null;
   }
 
   async confirmDeleteTenant() {
     if (!this.selectedTenant) return;
-    await this.tenantsSvc.remove(this.selectedTenant.id);
-    this.loadTenants();
-    this.closeDeleteTenantDialog();
+    this.deleteError = '';
+    this.deleteSaving = true;
+    try {
+      await this.tenantsSvc.remove(this.selectedTenant.id);
+      this.loadTenants();
+      this.closeDeleteTenantDialog();
+    } catch (err: any) {
+      this.deleteError = err?.message || 'Failed to delete tenant.';
+    } finally {
+      this.deleteSaving = false;
+    }
   }
 
   goBack() {

@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription, combineLatest } from 'rxjs';
-import { PropertiesService } from '../properties/properties.service';
+import { LandlordDashboardService } from './landlord-dashboard.service';
 import { TenantsService } from '../tenants/tenants.service';
 
 interface PropertyVm {
@@ -108,7 +108,7 @@ interface PropertyVm {
   `],
 })
 export class LandlordPropertiesPage implements OnInit, OnDestroy {
-  private propertiesSvc = inject(PropertiesService);
+  private dashboardSvc = inject(LandlordDashboardService);
   private tenantsSvc = inject(TenantsService);
   private router = inject(Router);
   private sub = new Subscription();
@@ -136,7 +136,7 @@ export class LandlordPropertiesPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.sub.add(
-      combineLatest([this.propertiesSvc.list(), this.tenantsSvc.list()]).subscribe({
+      combineLatest([this.dashboardSvc.getProperties(), this.tenantsSvc.list()]).subscribe({
         next: (result: any) => {
           const [properties, tenants] = result as [any[], any[]];
           const byProperty = new Map<string, number>();

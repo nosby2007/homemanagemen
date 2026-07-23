@@ -1,7 +1,10 @@
 
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
+import { UserService } from '../../core/services/user.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 @Component({
   selector: 'app-landlord-setting',
@@ -15,45 +18,54 @@ import { FormsModule } from '@angular/forms';
           Switch to {{ theme === 'light-theme' ? 'Dark' : 'Light' }} Theme
         </button>
       </div>
-      <div class="settings-section">
-        <h2>Account</h2>
-        <div class="setting-item">
-          <label for="name">Name</label>
-          <input id="name" [(ngModel)]="settings.name" type="text" placeholder="Your Name" />
+      <div class="state" *ngIf="loading">Loading your settings...</div>
+
+      <ng-container *ngIf="!loading">
+        <div class="feedback error" *ngIf="error">{{ error }}</div>
+        <div class="feedback success" *ngIf="successMessage">{{ successMessage }}</div>
+
+        <div class="settings-section">
+          <h2>Account</h2>
+          <div class="setting-item">
+            <label for="name">Name</label>
+            <input id="name" [(ngModel)]="settings.name" type="text" placeholder="Your Name" />
+          </div>
+          <div class="setting-item">
+            <label for="email">Email</label>
+            <input id="email" [ngModel]="settings.email" type="email" disabled />
+          </div>
+          <div class="setting-item">
+            <label for="phone">Phone</label>
+            <input id="phone" [(ngModel)]="settings.phone" type="tel" placeholder="Your Phone" />
+          </div>
         </div>
-        <div class="setting-item">
-          <label for="email">Email</label>
-          <input id="email" [(ngModel)]="settings.email" type="email" placeholder="Your Email" />
+        <div class="settings-section">
+          <h2>Notifications</h2>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" [(ngModel)]="settings.emailNotifications" />
+              Email Notifications
+            </label>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" [(ngModel)]="settings.smsNotifications" />
+              SMS Notifications
+            </label>
+          </div>
         </div>
-        <div class="setting-item">
-          <label for="phone">Phone</label>
-          <input id="phone" [(ngModel)]="settings.phone" type="tel" placeholder="Your Phone" />
+        <div class="settings-section">
+          <h2>Security</h2>
+          <div class="setting-item">
+            <button class="change-password" (click)="changePassword()" [disabled]="sendingReset">
+              {{ sendingReset ? 'Sending...' : 'Change Password' }}
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="settings-section">
-        <h2>Notifications</h2>
-        <div class="setting-item">
-          <label>
-            <input type="checkbox" [(ngModel)]="settings.emailNotifications" />
-            Email Notifications
-          </label>
+        <div class="settings-footer">
+          <button class="save-btn" (click)="saveSettings()" [disabled]="saving">{{ saving ? 'Saving...' : 'Save Changes' }}</button>
         </div>
-        <div class="setting-item">
-          <label>
-            <input type="checkbox" [(ngModel)]="settings.smsNotifications" />
-            SMS Notifications
-          </label>
-        </div>
-      </div>
-      <div class="settings-section">
-        <h2>Security</h2>
-        <div class="setting-item">
-          <button class="change-password" (click)="changePassword()">Change Password</button>
-        </div>
-      </div>
-      <div class="settings-footer">
-        <button class="save-btn" (click)="saveSettings()">Save Changes</button>
-      </div>
+      </ng-container>
     </div>
   `,
   styles: [`
@@ -120,6 +132,32 @@ import { FormsModule } from '@angular/forms';
       border-color: var(--primary);
       outline: none;
     }
+    input:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+    .state {
+      text-align: center;
+      padding: 24px;
+      color: var(--text);
+      opacity: .75;
+    }
+    .feedback {
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+    .feedback.error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+    }
+    .feedback.success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
     .change-password {
       background: var(--secondary);
       color: #fff;
@@ -172,8 +210,17 @@ import { FormsModule } from '@angular/forms';
     }
   `]
 })
-export class LandlordSettingPage {
+export class LandlordSettingPage implements OnInit {
+  private userSvc = inject(UserService);
+  private authSvc = inject(AuthService);
+
   theme: 'light-theme' | 'dark-theme' = 'light-theme';
+  loading = true;
+  saving = false;
+  sendingReset = false;
+  error = '';
+  successMessage = '';
+
   settings = {
     name: '',
     email: '',
@@ -182,17 +229,61 @@ export class LandlordSettingPage {
     smsNotifications: false
   };
 
+  async ngOnInit() {
+    try {
+      const profile = await firstValueFrom(this.userSvc.getCurrentUserProfile());
+      this.settings = {
+        name: profile?.fullName || profile?.displayName || '',
+        email: profile?.email || '',
+        phone: profile?.phone || '',
+        emailNotifications: profile?.emailNotifications ?? true,
+        smsNotifications: profile?.smsNotifications ?? false,
+      };
+    } catch (err: any) {
+      this.error = err?.message || 'Unable to load your settings.';
+    } finally {
+      this.loading = false;
+    }
+  }
+
   toggleTheme() {
     this.theme = this.theme === 'light-theme' ? 'dark-theme' : 'light-theme';
   }
 
-  saveSettings() {
-    // Implement save logic (e.g., API call)
-    alert('Settings saved!');
+  async saveSettings() {
+    this.error = '';
+    this.successMessage = '';
+    this.saving = true;
+    try {
+      await this.userSvc.updateCurrentUserProfile({
+        fullName: this.settings.name,
+        phone: this.settings.phone,
+        emailNotifications: this.settings.emailNotifications,
+        smsNotifications: this.settings.smsNotifications,
+      } as any);
+      this.successMessage = 'Settings saved.';
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to save settings.';
+    } finally {
+      this.saving = false;
+    }
   }
 
-  changePassword() {
-    // Implement password change logic (e.g., open modal)
-    alert('Password change requested!');
+  async changePassword() {
+    this.error = '';
+    this.successMessage = '';
+    if (!this.settings.email) {
+      this.error = 'No email on file for this account.';
+      return;
+    }
+    this.sendingReset = true;
+    try {
+      await this.authSvc.forgotPassword(this.settings.email);
+      this.successMessage = `Password reset email sent to ${this.settings.email}.`;
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to send password reset email.';
+    } finally {
+      this.sendingReset = false;
+    }
   }
 }

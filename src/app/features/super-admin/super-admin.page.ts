@@ -189,19 +189,6 @@ import { SuperAdminMetricsService } from './super-admin-metrics.service';
       </div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="action-bar">
-      <button class="btn btn-primary" disabled title="Coming soon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        Edit Organization
-      </button>
-      <button class="btn btn-secondary" disabled title="Coming soon">Manage Branding</button>
-      <button class="btn btn-secondary" disabled title="Coming soon">Export Data</button>
-      <button class="btn btn-danger" disabled title="Coming soon">Suspend Organization</button>
-    </div>
   </div>
   `,
   styles: [`
@@ -680,66 +667,6 @@ import { SuperAdminMetricsService } from './super-admin-metrics.service';
     .status-success { background: #10b98133; color: #10b981; }
     .status-warning { background: #f59e0b33; color: #f59e0b; }
     .status-error { background: #ef444433; color: #ef4444; }
-
-    /* Action Bar */
-    .action-bar {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      padding: 14px 24px;
-      border-radius: 12px;
-      border: none;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-      box-shadow: none !important;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #60a5fa, #3b82f6);
-      color: white;
-      box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);
-    }
-
-    .btn-secondary {
-      background: #ffffff;
-      color: #0f172a;
-      border: 1px solid #cbd5e1;
-    }
-
-    .btn-secondary:hover {
-      background: #eff6ff;
-      border-color: #93c5fd;
-    }
-
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.1);
-      color: #ef4444;
-      border: 1px solid rgba(239, 68, 68, 0.2);
-    }
-
-    .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.2);
-      border-color: rgba(239, 68, 68, 0.3);
-    }
   `]
 })
 export class SuperAdminPage implements OnInit {

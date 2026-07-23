@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { Subscription, combineLatest } from 'rxjs';
 import { Inspection } from '../../core/models/inspection.models';
 import { InspectionsService } from '../inspections/inspections.service';
-import { PropertiesService } from '../properties/properties.service';
+import { LandlordDashboardService } from './landlord-dashboard.service';
 
 interface InspectionVm extends Inspection {
   propertyName: string;
@@ -107,7 +107,7 @@ interface InspectionVm extends Inspection {
   `],
 })
 export class LandlordInspectionPage implements OnInit, OnDestroy {
-  private propertiesSvc = inject(PropertiesService);
+  private dashboardSvc = inject(LandlordDashboardService);
   private inspectionsSvc = inject(InspectionsService);
   private router = inject(Router);
   private sub = new Subscription();
@@ -121,7 +121,7 @@ export class LandlordInspectionPage implements OnInit, OnDestroy {
   filtered: InspectionVm[] = [];
 
   ngOnInit() {
-    this.sub.add(this.propertiesSvc.list().subscribe({
+    this.sub.add(this.dashboardSvc.getProperties().subscribe({
       next: (properties: any[]) => {
         const rows = properties || [];
         if (!rows.length) {
@@ -201,6 +201,11 @@ export class LandlordInspectionPage implements OnInit, OnDestroy {
   }
 
   async markCompleted(item: InspectionVm) {
-    await this.inspectionsSvc.update(item.propertyId, item.id, { status: 'completed' });
+    this.error = '';
+    try {
+      await this.inspectionsSvc.update(item.propertyId, item.id, { status: 'completed' });
+    } catch (err: any) {
+      this.error = err?.message || 'Failed to mark inspection completed.';
+    }
   }
 }

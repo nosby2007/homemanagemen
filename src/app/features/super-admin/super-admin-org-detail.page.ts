@@ -152,6 +152,17 @@ type TabKey = 'branding' | 'members' | 'kpi' | 'actions';
    <!-- ACTIONS -->
 <div *ngIf="tab==='actions'">
   <div class="panel">
+    <div class="panel-title">Organization name</div>
+    <div class="panel-sub">Update the name shown for this organization.</div>
+    <div class="form">
+      <input class="input" [(ngModel)]="nameDraft" placeholder="Organization name" />
+      <div class="row">
+        <button class="btn" (click)="saveOrgName()" [disabled]="savingName">{{ savingName ? 'Saving...' : 'Save name' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
     <div class="panel-title">Actions</div>
     <div class="panel-sub">Administrative actions for this organization.</div>
 
@@ -161,6 +172,12 @@ type TabKey = 'branding' | 'members' | 'kpi' | 'actions';
      <button class="btn" (click)="manageMembers()">Manage members</button>
 
 <button class="btn" (click)="openAsOrgMember()">Open org as member</button>
+
+<button class="btn" (click)="exportData()">Export data</button>
+
+<button class="btn danger" (click)="toggleSuspend()" [disabled]="suspending">
+  {{ suspending ? 'Working...' : (isSuspended ? 'Reactivate organization' : 'Suspend organization') }}
+</button>
 
 
     <div class="note">
@@ -233,6 +250,14 @@ type TabKey = 'branding' | 'members' | 'kpi' | 'actions';
   opacity:.55;
   cursor:not-allowed;
 }
+.btn.danger{
+  background: rgba(239,68,68,.14);
+  border-color: rgba(239,68,68,.35);
+  color: #fecaca;
+}
+.btn.danger:hover{
+  background: rgba(239,68,68,.22);
+}
 
     .empty{padding:12px;opacity:.75}
     .error{padding:10px 12px;border-radius:12px;background:rgba(239,68,68,.14);border:1px solid rgba(239,68,68,.35);color:#fecaca;margin-bottom:10px}
@@ -280,6 +305,13 @@ export class SuperAdminOrgDetailPage {
   actionMessage = '';
   error = '';
 
+  nameDraft = '';
+  savingName = false;
+  suspending = false;
+  get isSuspended(): boolean {
+    return this.org?.status === 'disabled';
+  }
+
   constructor() {
     this.orgId = this.route.snapshot.paramMap.get('orgId') || '';
     const tab = (this.route.snapshot.queryParamMap.get('tab') || 'branding') as TabKey;
@@ -301,6 +333,7 @@ export class SuperAdminOrgDetailPage {
     this.membersLoaded = false;
     try {
       this.org = await this.svc.getOrg(this.orgId);
+      this.nameDraft = this.org?.name || '';
 
       this.branding = await this.svc.getBranding(this.orgId);
       this.brandingExists = !!this.branding;
@@ -352,6 +385,67 @@ export class SuperAdminOrgDetailPage {
       this.saving = false;
     }
   }
+
+async saveOrgName() {
+  this.error = '';
+  const trimmed = (this.nameDraft || '').trim();
+  if (!trimmed) {
+    this.error = 'Organization name is required.';
+    return;
+  }
+  this.savingName = true;
+  try {
+    await this.svc.updateOrgName(this.orgId, trimmed);
+    this.org = { ...(this.org || { orgId: this.orgId }), name: trimmed };
+    this.actionMessage = 'Organization name updated.';
+  } catch (e: any) {
+    this.error = e?.message ?? 'Failed to update organization name.';
+  } finally {
+    this.savingName = false;
+  }
+}
+
+async toggleSuspend() {
+  this.error = '';
+  this.actionMessage = '';
+  const nextStatus: 'active' | 'disabled' = this.isSuspended ? 'active' : 'disabled';
+  const confirmMessage = nextStatus === 'disabled'
+    ? 'Suspend this organization? Its members will be blocked from accessing it until reactivated.'
+    : 'Reactivate this organization?';
+  if (!confirm(confirmMessage)) return;
+
+  this.suspending = true;
+  try {
+    await this.svc.updateOrgStatus(this.orgId, nextStatus);
+    this.org = { ...(this.org || { orgId: this.orgId }), status: nextStatus };
+    this.actionMessage = nextStatus === 'disabled' ? 'Organization suspended.' : 'Organization reactivated.';
+  } catch (e: any) {
+    this.error = e?.message ?? 'Failed to update organization status.';
+  } finally {
+    this.suspending = false;
+  }
+}
+
+exportData() {
+  this.error = '';
+  try {
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      org: this.org,
+      totals: this.totals,
+      members: this.members,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `org-${this.orgId}-export-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  } catch (e: any) {
+    this.error = e?.message ?? 'Failed to export data.';
+  }
+}
 
 manageMembers() {
   this.router.navigateByUrl(`/super-admin/orgs/${this.orgId}/members`);

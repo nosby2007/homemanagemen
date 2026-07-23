@@ -20,6 +20,7 @@ export interface Tenant {
   emergencyContact?: string;
   emergencyPhone?: string;
   moveInDate?: number;
+  leaseEndDate?: number;
   status?: 'active' | 'inactive' | 'lead';
   /** ID of the currently assigned unit */
   currentUnitId?: string;
@@ -123,6 +124,7 @@ export class TenantsService {
       displayName: data.displayName ?? '',
       phone: data.phone ?? '',
       status: data.status ?? 'lead',
+      leaseEndDate: data.leaseEndDate,
       currentPropertyId: scope.currentPropertyId,
       currentUnitId: scope.currentUnitId,
       currentLeaseId: data.currentLeaseId,

@@ -18,6 +18,7 @@ import {
 export type OrgDoc = {
   orgId: string;
   name?: string;
+  status?: 'active' | 'disabled' | 'pending';
   createdAt?: any;
   updatedAt?: any;
 };
@@ -71,6 +72,26 @@ export class SuperAdminOrgDetailService {
       updatedAt: serverTimestamp(),
       createdAt: (patch as any)?.createdAt ?? serverTimestamp(),
     }, { merge: true });
+  }
+
+  /** Updates the org name on both the legacy `orgs/{orgId}` doc and the canonical `organizations/{orgId}` doc. */
+  async updateOrgName(orgId: string, name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Organization name is required.');
+    const now = serverTimestamp();
+    await Promise.all([
+      setDoc(doc(this.fs as any, `orgs/${orgId}`) as any, { name: trimmed, updatedAt: now }, { merge: true }),
+      setDoc(doc(this.fs as any, `organizations/${orgId}`) as any, { name: trimmed, updatedAt: now }, { merge: true }),
+    ]);
+  }
+
+  /** Updates org status on both docs. Reuses the existing 'active'|'disabled'|'pending' enum - there is no separate 'suspended' state. */
+  async updateOrgStatus(orgId: string, status: 'active' | 'disabled' | 'pending'): Promise<void> {
+    const now = serverTimestamp();
+    await Promise.all([
+      setDoc(doc(this.fs as any, `orgs/${orgId}`) as any, { status, updatedAt: now }, { merge: true }),
+      setDoc(doc(this.fs as any, `organizations/${orgId}`) as any, { status, updatedAt: now }, { merge: true }),
+    ]);
   }
 
   async listMembers(orgId: string, max = 50): Promise<MemberRow[]> {
