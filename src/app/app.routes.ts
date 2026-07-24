@@ -160,6 +160,7 @@ export const routes: Routes = [
       { path: 'maintenance', data: { roles: [...MAINTENANCE_ROLES, 'landlord'] }, loadComponent: () => import('./features/maintenance/maintenance.page').then(m => m.MaintenancePage) },
       { path: 'documents', data: { roles: [...LANDLORD_ROLES, ...SALES_ROLES, 'vendor', 'staff', 'maintenance'] }, loadComponent: () => import('./features/documents/documents.page').then(m => m.DocumentsPage) },
       { path: 'reports', data: { roles: [...PLATFORM_ADMIN_ROLES, 'broker', 'landlord'] }, loadComponent: () => import('./features/reports/reports.builder.page').then(m => m.ReportsBuilderPage) },
+      { path: 'property-reports', data: { roles: [...LANDLORD_ROLES] }, loadComponent: () => import('./features/reports/property-reports.page').then(m => m.PropertyReportsPage) },
 
       // Profile / settings
       { path: 'profile', data: { roles: ['super_admin', 'agency_admin', 'broker', 'agent', 'admin', 'manager', 'staff', 'landlord', 'tenant', 'buyer', 'seller', 'vendor', 'maintenance'] }, loadComponent: () => import('./features/profile/profile.page').then(m => m.ProfilePage) },

@@ -44,6 +44,10 @@ import { signOut } from 'firebase/auth';
           <span class="icon">📊</span>
           Reports
         </a>
+        <a routerLink="/property-reports" routerLinkActive="active" class="nav-link" (click)="closeMenuOnMobile()">
+          <span class="icon">📈</span>
+          Property Reports
+        </a>
         <a routerLink="/landlord/settings" routerLinkActive="active" class="nav-link" (click)="closeMenuOnMobile()">
           <span class="icon">⚙️</span>
           Settings
