@@ -217,6 +217,7 @@ export class LayoutComponent implements OnDestroy {
     { label: 'Invitations', route: '/pending-invitations', roles: [...PLATFORM_ADMIN_ROLES, 'broker'] },
     { label: 'Documents', route: '/documents', roles: ['super_admin', 'agency_admin', 'broker', 'agent', 'admin', 'manager', 'staff', 'landlord', 'tenant', 'buyer', 'seller', 'vendor', 'maintenance'] },
     { label: 'Reports', route: '/reports', roles: [...PLATFORM_ADMIN_ROLES, 'broker', 'landlord'] },
+    { label: 'Property Reports', route: '/property-reports', roles: [...LANDLORD_ROLES] },
     { label: 'Settings', route: '/settings', roles: [...PLATFORM_ADMIN_ROLES, 'broker', 'landlord'] },
   ];
 
