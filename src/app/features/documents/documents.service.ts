@@ -3,14 +3,18 @@ import {
   Firestore,
   collection,
   collectionData,
+  deleteDoc,
   doc,
+  getDoc,
   setDoc,
+  updateDoc,
   query,
   orderBy,
   where,
   limit,
 } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
+import { Storage, deleteObject, ref } from '@angular/fire/storage';
 import { OrgContextService } from '../../core/org/org-context.service';
 import { StorageUploadService } from '../../core/utils/storage-upload.service';
 import { DocumentCategory, DocumentRecord } from '../../core/models/domain.models';
@@ -22,6 +26,7 @@ import { stripUndefined } from '../../core/utils/firestore-clean';
 export class DocumentsService {
   private fs = inject(Firestore);
   private auth = inject(Auth);
+  private storage = inject(Storage);
   private org = inject(OrgContextService);
   private upload = inject(StorageUploadService);
 
@@ -98,5 +103,28 @@ export class DocumentsService {
 
     await setDoc(doc(this.fs, `orgs/${orgId}/documents/${id}`), stripUndefined(docDataValue) as any);
     return id;
+  }
+
+  async update(documentId: string, patch: Partial<DocumentRecord>) {
+    const orgId = this.org.requireOrgId();
+    await updateDoc(doc(this.fs, `orgs/${orgId}/documents/${documentId}`), stripUndefined({
+      ...patch,
+      updatedAt: Date.now(),
+    } as any) as any);
+  }
+
+  async remove(documentId: string) {
+    const orgId = this.org.requireOrgId();
+    const ref_ = doc(this.fs, `orgs/${orgId}/documents/${documentId}`);
+    const snap = await getDoc(ref_);
+    const storagePath = snap.exists() ? (snap.data() as DocumentRecord).storagePath : undefined;
+    await deleteDoc(ref_);
+    if (storagePath) {
+      try {
+        await deleteObject(ref(this.storage, storagePath));
+      } catch {
+        // Best-effort cleanup; the document record is already deleted.
+      }
+    }
   }
 }

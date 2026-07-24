@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, deleteDoc, doc, docData, query, orderBy, where, limit, setDoc, updateDoc } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, deleteDoc, doc, docData, getDoc, query, orderBy, where, limit, setDoc, updateDoc } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
 import { OrgContextService } from '../../core/org/org-context.service';
 import { stripUndefined } from '../../core/utils/firestore-clean';
@@ -155,6 +155,12 @@ export class TenantsService {
   }
 
   async remove(tenantId: string) {
-    await deleteDoc(doc(this.fs, `orgs/${this.org.requireOrgId()}/tenants/${tenantId}`));
+    const ref = doc(this.fs, `orgs/${this.org.requireOrgId()}/tenants/${tenantId}`);
+    const snap = await getDoc(ref);
+    const tenant = snap.exists() ? (snap.data() as Tenant) : null;
+    if (tenant?.currentLeaseId || tenant?.status === 'active') {
+      throw new Error('Cannot delete a tenant with an active lease. End the lease first.');
+    }
+    await deleteDoc(ref);
   }
 }

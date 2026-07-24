@@ -19,9 +19,11 @@ import { OrgContextService } from '../../core/org/org-context.service';
           </div>
           <div class="actions">
             <button type="button" (click)="edit(tenant.id)">Edit</button>
+            <button type="button" class="warn" [disabled]="deleting" (click)="deleteTenant(tenant)">{{ deleting ? 'Deleting...' : 'Delete' }}</button>
             <button type="button" class="ghost" (click)="back()">Back</button>
           </div>
         </header>
+        <div class="delete-error" *ngIf="deleteError">{{ deleteError }}</div>
 
         <article class="card">
           <div class="row"><span>Name</span><strong>{{ tenant.displayName || '-' }}</strong></div>
@@ -63,6 +65,9 @@ import { OrgContextService } from '../../core/org/org-context.service';
     .actions { display:flex; gap:8px; }
     button { border:none; border-radius:10px; padding:10px 12px; font-weight:700; cursor:pointer; background:linear-gradient(125deg,#0ea5e9,#0284c7); color:#fff; }
     .ghost { background:rgba(148,163,184,.2); color:#e2e8f0; }
+    button.warn { background: rgba(239, 68, 68, .2); color: #fecaca; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .delete-error { color:#fecaca; background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.35); border-radius:10px; padding:9px 10px; font-size:12px; }
     .card { border:1px solid rgba(148,163,184,.2); border-radius:16px; background:rgba(15,23,42,.78); color:#e2e8f0; padding:14px; max-width:720px; }
     .row { display:flex; justify-content:space-between; gap:10px; border-top:1px solid rgba(148,163,184,.15); padding:12px 0; }
     .row:first-child { border-top:none; }
@@ -90,9 +95,26 @@ export class TenantDetailPage {
   repairing = false;
   repairError = '';
   repairSuccess = '';
+  deleting = false;
+  deleteError = '';
 
   async edit(tenantId: string) {
     await this.router.navigateByUrl(`/tenants/${tenantId}/edit`);
+  }
+
+  async deleteTenant(tenant: any) {
+    if (!tenant?.id) return;
+    if (!confirm(`Delete tenant "${tenant.displayName || tenant.email || tenant.id}"?`)) return;
+    this.deleteError = '';
+    this.deleting = true;
+    try {
+      await this.tenants.remove(String(tenant.id));
+      await this.router.navigateByUrl('/tenants');
+    } catch (err: any) {
+      this.deleteError = err?.message || 'Failed to delete tenant.';
+    } finally {
+      this.deleting = false;
+    }
   }
 
   async back() {

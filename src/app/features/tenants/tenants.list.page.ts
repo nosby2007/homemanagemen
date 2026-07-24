@@ -49,8 +49,10 @@ import { OrgContextService } from '../../core/org/org-context.service';
               <button type="button" *ngIf="(tenant.authStatus || 'not_invited') === 'not_invited'" (click)="sendInvitation(tenant)">Send Invitation</button>
               <button type="button" *ngIf="tenant.authStatus === 'invited'" (click)="resendInvitation(tenant)">Resend Invitation</button>
               <button type="button" class="warn" *ngIf="tenant.authStatus === 'active'" (click)="disableAccess(tenant)">Disable Access</button>
+              <button type="button" class="warn" [disabled]="busyId === tenant.id" (click)="deleteTenant(tenant)">Delete</button>
             </div>
             <div class="invite-error" *ngIf="inviteErrors[tenant.id]">{{ inviteErrors[tenant.id] }}</div>
+            <div class="invite-error" *ngIf="deleteErrors[tenant.id]">{{ deleteErrors[tenant.id] }}</div>
           </div>
 
           <div class="empty" *ngIf="!filter(tenants).length">No tenants found.</div>
@@ -95,6 +97,8 @@ export class TenantsListPage {
   query = '';
   statusFilter: 'all' | 'active' | 'inactive' | 'lead' = 'all';
   inviteErrors: Record<string, string> = {};
+  deleteErrors: Record<string, string> = {};
+  busyId: string | null = null;
 
   filter(items: Tenant[]): Tenant[] {
     const q = this.query.trim().toLowerCase();
@@ -159,5 +163,19 @@ export class TenantsListPage {
   async disableAccess(tenant: Tenant) {
     if (!tenant.id) return;
     await this.svc.update(tenant.id, { authStatus: 'disabled' } as any);
+  }
+
+  async deleteTenant(tenant: Tenant) {
+    if (!tenant.id) return;
+    if (!confirm(`Delete tenant "${tenant.displayName || tenant.email || tenant.id}"?`)) return;
+    delete this.deleteErrors[tenant.id];
+    this.busyId = tenant.id;
+    try {
+      await this.svc.remove(tenant.id);
+    } catch (err: any) {
+      this.deleteErrors[tenant.id] = err?.message || 'Failed to delete tenant.';
+    } finally {
+      this.busyId = null;
+    }
   }
 }
