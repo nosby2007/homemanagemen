@@ -14,7 +14,7 @@ import {
   updateDoc,
   where,
 } from '@angular/fire/firestore';
-import { Observable, from, switchMap } from 'rxjs';
+import { Observable, from, of, switchMap } from 'rxjs';
 import { AccessScopeService } from '../../core/auth/access-scope.service';
 import { OrgContextService } from '../../core/org/org-context.service';
 import { ShowingRecord, ShowingStatus } from '../../core/models/real-estate.models';
@@ -42,11 +42,16 @@ export class ShowingsService {
   list(): Observable<any[]> {
     return from(this.scope.getCurrentScope()).pipe(
       switchMap((scope) => {
+        if (scope.isPrivileged) {
+          return collectionData(query(this.col(), orderBy('scheduledAt', 'desc'), limit(300)), { idField: 'id' }) as any;
+        }
+        if (scope.role === 'buyer' || scope.role === 'seller' || scope.role === 'client') {
+          const ids = (scope.clientIds || []).slice(0, 10);
+          if (!ids.length) return of([]);
+          return collectionData(query(this.col(), where('clientId', 'in', ids), orderBy('scheduledAt', 'desc'), limit(200)), { idField: 'id' }) as any;
+        }
         const agentId = scope.agentId || scope.uid;
-        const q = scope.isPrivileged
-          ? query(this.col(), orderBy('scheduledAt', 'desc'), limit(300))
-          : query(this.col(), where('agentId', '==', agentId), orderBy('scheduledAt', 'desc'), limit(200));
-        return collectionData(q, { idField: 'id' }) as any;
+        return collectionData(query(this.col(), where('agentId', '==', agentId), orderBy('scheduledAt', 'desc'), limit(200)), { idField: 'id' }) as any;
       }),
     ) as any;
   }

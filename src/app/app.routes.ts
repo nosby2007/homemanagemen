@@ -109,7 +109,7 @@ export const routes: Routes = [
       { path: 'listings/:id/edit', data: { roles: [...SALES_ROLES] }, loadComponent: () => import('./features/listings/listing.form.page').then(m => m.ListingFormPage) },
 
       // CRM / Sales pipeline
-      { path: 'leads', data: { roles: [...SALES_ROLES, 'seller', 'buyer'] }, loadComponent: () => import('./features/leads/leads.page').then(m => m.LeadsPage) },
+      { path: 'leads', data: { roles: [...SALES_ROLES] }, loadComponent: () => import('./features/leads/leads.page').then(m => m.LeadsPage) },
       { path: 'showings', data: { roles: [...SALES_ROLES, 'seller', 'buyer'] }, loadComponent: () => import('./features/showings/showings.page').then(m => m.ShowingsPage) },
       { path: 'offers', data: { roles: [...SALES_ROLES, 'seller', 'buyer'] }, loadComponent: () => import('./features/offers/offers.page').then(m => m.OffersPage) },
       { path: 'transactions', data: { roles: [...SALES_ROLES, 'seller', 'buyer'] }, loadComponent: () => import('./features/transactions/transactions.page').then(m => m.TransactionsPage) },

@@ -6,11 +6,13 @@ import {
   deleteDoc,
   doc,
   docData,
+  getDocs,
   query,
   orderBy,
   limit,
   setDoc,
-  updateDoc
+  updateDoc,
+  where,
 } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
 import { OrgContextService } from '../../core/org/org-context.service';
@@ -47,6 +49,7 @@ export class PropertiesService {
     const now = Date.now();
 
     const data: Property = {
+      ...payload,
       id,
       orgId,
       name: payload.name ?? 'New Property',
@@ -55,11 +58,7 @@ export class PropertiesService {
       state: payload.state ?? '',
       zipCode: payload.zipCode ?? '',
       country: payload.country ?? '',
-      type: payload.type ?? undefined,
-      squareFeet: payload.squareFeet ?? undefined,
-      yearBuilt: payload.yearBuilt ?? undefined,
       furnished: payload.furnished ?? false,
-      securityDeposit: payload.securityDeposit ?? undefined,
       owner: payload.owner ?? '',
       manager: payload.manager ?? '',
       notes: payload.notes ?? '',
@@ -87,6 +86,26 @@ export class PropertiesService {
 
   async delete(propertyId: string) {
     const orgId = this.org.requireOrgId();
+
+    const activeLeasesSnap = await getDocs(query(
+      collection(this.fs, `orgs/${orgId}/properties/${propertyId}/leases`),
+      where('status', 'in', ['active', 'pending']),
+      limit(1),
+    ));
+    if (!activeLeasesSnap.empty) {
+      throw new Error('Cannot delete a property with active leases. End or archive the lease(s) first.');
+    }
+
+    const occupiedUnitsSnap = await getDocs(query(
+      collection(this.fs, `orgs/${orgId}/units`),
+      where('propertyId', '==', propertyId),
+      where('status', '==', 'occupied'),
+      limit(1),
+    ));
+    if (!occupiedUnitsSnap.empty) {
+      throw new Error('Cannot delete a property with occupied units. Vacate the unit(s) first.');
+    }
+
     await deleteDoc(doc(this.fs, `orgs/${orgId}/properties/${propertyId}`));
   }
 } 

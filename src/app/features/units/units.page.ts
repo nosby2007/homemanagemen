@@ -68,6 +68,8 @@ import { LeasesService } from '../leases/leases.service';
             </select>
           </div>
 
+          <div class="delete-error" *ngIf="deleteError">{{ deleteError }}</div>
+
           <div class="table" *ngIf="units$ | async as units">
             <div class="thead">
               <div>Unit</div><div>Property</div><div>Status</div><div>Rent</div><div>Actions</div>
@@ -105,6 +107,7 @@ import { LeasesService } from '../leases/leases.service';
     .cta { background: linear-gradient(125deg, #0ea5e9, #0284c7); color: #fff; }
     .ghost { background: rgba(148,163,184,.2); color: #e2e8f0; }
     .toolbar { display: grid; grid-template-columns: 1fr 200px; gap: 8px; margin-bottom: 10px; }
+    .delete-error { background: rgba(239,68,68,.14); border: 1px solid rgba(239,68,68,.35); color: #fecaca; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
     .table { border: 1px solid rgba(148,163,184,.22); border-radius: 12px; overflow: hidden; }
     .thead, .trow { display: grid; grid-template-columns: 1.4fr 1fr .7fr .8fr .8fr; gap: 10px; padding: 10px 12px; align-items: center; }
     .thead { background: rgba(148,163,184,.12); font-weight: 800; font-size: 12px; }
@@ -136,6 +139,7 @@ export class UnitsPage {
   properties: any[] = [];
   tenants: any[] = [];
   leases: any[] = [];
+  deleteError = '';
 
   form = this.fb.group({
     propertyId: ['', [Validators.required]],
@@ -234,6 +238,11 @@ export class UnitsPage {
 
   async remove(unitId: string) {
     if (!confirm('Delete this unit?')) return;
-    await this.svc.remove(unitId);
+    this.deleteError = '';
+    try {
+      await this.svc.remove(unitId);
+    } catch (err: any) {
+      this.deleteError = err?.message || 'Failed to delete unit.';
+    }
   }
 }

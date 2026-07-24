@@ -204,8 +204,8 @@ export class AddPaymentPage implements OnInit {
         paidAt,
         tenantId: this.tenantId,
         unitId: this.unitId,
-        paymentMethod: v.paymentMethod || undefined,
-        referenceNumber: (v.referenceNumber || '').trim() || undefined,
+        method: v.paymentMethod || undefined,
+        reference: (v.referenceNumber || '').trim() || undefined,
         notes: (v.notes || '').trim() || undefined,
       } as any);
 

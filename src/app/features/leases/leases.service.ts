@@ -6,6 +6,7 @@ import {
   deleteDoc,
   doc,
   docData,
+  getDoc,
   query,
   orderBy,
   limit,
@@ -162,7 +163,42 @@ export class LeasesService {
   }
   async delete(propertyId: string, leaseId: string) {
     const orgId = this.requireOrgId();
-    await deleteDoc(doc(this.fs, `orgs/${orgId}/properties/${propertyId}/leases/${leaseId}`));
+    const leaseRef = doc(this.fs, `orgs/${orgId}/properties/${propertyId}/leases/${leaseId}`);
+    const leaseSnap = await getDoc(leaseRef);
+    const lease = leaseSnap.exists() ? (leaseSnap.data() as Lease) : null;
+
+    await deleteDoc(leaseRef);
+
+    // Reverse the linkage create() applied - but only if the unit/tenant still points at
+    // *this* lease, so we don't clobber a newer lease that's since taken its place.
+    if (lease?.unitId) {
+      try {
+        const unitSnap = await getDoc(doc(this.fs, `orgs/${orgId}/units/${lease.unitId}`));
+        if (unitSnap.exists() && (unitSnap.data() as any)?.activeLeaseId === leaseId) {
+          await this.units.update(lease.unitId, {
+            activeTenantId: null,
+            activeLeaseId: null,
+            status: 'vacant',
+          } as any);
+        }
+      } catch {
+        // Best-effort cleanup; the lease itself is already deleted.
+      }
+    }
+
+    if (lease?.tenantId) {
+      try {
+        const tenantSnap = await getDoc(doc(this.fs, `orgs/${orgId}/tenants/${lease.tenantId}`));
+        if (tenantSnap.exists() && (tenantSnap.data() as any)?.currentLeaseId === leaseId) {
+          await this.tenants.update(lease.tenantId, {
+            currentLeaseId: null,
+            status: 'inactive',
+          } as any);
+        }
+      } catch {
+        // Best-effort cleanup; the lease itself is already deleted.
+      }
+    }
   }
   Timestamp = Timestamp;
 }

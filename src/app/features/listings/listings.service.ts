@@ -41,11 +41,14 @@ export class ListingsService {
   list(): Observable<any[]> {
     return from(this.scope.getCurrentScope()).pipe(
       switchMap((scope) => {
+        if (scope.isPrivileged) {
+          return collectionData(query(this.col(), orderBy('updatedAt', 'desc'), limit(300)), { idField: 'id' }) as any;
+        }
+        if (scope.role === 'buyer' || scope.role === 'seller' || scope.role === 'client') {
+          return collectionData(query(this.col(), where('listingStatus', '==', 'active'), orderBy('updatedAt', 'desc'), limit(300)), { idField: 'id' }) as any;
+        }
         const agentId = scope.agentId || scope.uid;
-        const q = scope.isPrivileged
-          ? query(this.col(), orderBy('updatedAt', 'desc'), limit(300))
-          : query(this.col(), where('assignedAgentId', '==', agentId), orderBy('updatedAt', 'desc'), limit(200));
-        return collectionData(q, { idField: 'id' }) as any;
+        return collectionData(query(this.col(), where('assignedAgentId', '==', agentId), orderBy('updatedAt', 'desc'), limit(200)), { idField: 'id' }) as any;
       }),
     ) as any;
   }

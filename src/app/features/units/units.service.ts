@@ -4,6 +4,7 @@ import {
   collection,
   collectionData,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -71,6 +72,12 @@ export class UnitsService {
   }
 
   async remove(unitId: string) {
-    await deleteDoc(doc(this.fs, `orgs/${this.org.requireOrgId()}/units/${unitId}`));
+    const ref = doc(this.fs, `orgs/${this.org.requireOrgId()}/units/${unitId}`);
+    const snap = await getDoc(ref);
+    const unit = snap.exists() ? (snap.data() as any) : null;
+    if (unit?.activeTenantId || unit?.status === 'occupied') {
+      throw new Error('Cannot delete an occupied unit. End the lease and vacate the tenant first.');
+    }
+    await deleteDoc(ref);
   }
 }

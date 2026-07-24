@@ -15,7 +15,7 @@ import {
   updateDoc,
   where,
 } from '@angular/fire/firestore';
-import { Observable, from, switchMap } from 'rxjs';
+import { Observable, from, of, switchMap } from 'rxjs';
 import { AccessScopeService } from '../../core/auth/access-scope.service';
 import { OrgContextService } from '../../core/org/org-context.service';
 import { ActivityLogService } from '../../core/services/activity-log.service';
@@ -24,6 +24,7 @@ import { TRANSACTION_TRANSITIONS } from '../../core/auth/rbac';
 import { TransactionRecord, TransactionStatus } from '../../core/models/real-estate.models';
 import { stripUndefined } from '../../core/utils/firestore-clean';
 import { requireTransactionScope } from '../../core/utils/property-scope';
+import { CommissionsService } from '../commissions/commissions.service';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionsService {
@@ -33,6 +34,7 @@ export class TransactionsService {
   private scope = inject(AccessScopeService);
   private activity = inject(ActivityLogService);
   private notifications = inject(NotificationService);
+  private commissions = inject(CommissionsService);
 
   private requireUid(): string {
     const uid = this.auth.currentUser?.uid;
@@ -48,11 +50,17 @@ export class TransactionsService {
   list(): Observable<any[]> {
     return from(this.scope.getCurrentScope()).pipe(
       switchMap((scope) => {
+        if (scope.isPrivileged) {
+          return collectionData(query(this.col(), orderBy('updatedAt', 'desc'), limit(300)), { idField: 'id' }) as any;
+        }
+        if (scope.role === 'buyer' || scope.role === 'seller' || scope.role === 'client') {
+          const ids = (scope.clientIds || []).slice(0, 10);
+          if (!ids.length) return of([]);
+          const field = scope.role === 'seller' ? 'sellerId' : 'buyerId';
+          return collectionData(query(this.col(), where(field, 'in', ids), orderBy('updatedAt', 'desc'), limit(200)), { idField: 'id' }) as any;
+        }
         const agentId = scope.agentId || scope.uid;
-        const q = scope.isPrivileged
-          ? query(this.col(), orderBy('updatedAt', 'desc'), limit(300))
-          : query(this.col(), where('agentId', '==', agentId), orderBy('updatedAt', 'desc'), limit(200));
-        return collectionData(q, { idField: 'id' }) as any;
+        return collectionData(query(this.col(), where('agentId', '==', agentId), orderBy('updatedAt', 'desc'), limit(200)), { idField: 'id' }) as any;
       }),
     ) as any;
   }
@@ -96,20 +104,24 @@ export class TransactionsService {
     };
 
     await setDoc(doc(this.fs, `orgs/${orgId}/transactions/${id}`), stripUndefined(data) as any);
-    await this.activity.write({
-      entityType: 'transaction',
-      entityId: id,
-      action: 'created',
-      message: `Transaction created: Sale Price $${data.salePrice}`,
-      metadata: { propertyId: data.propertyId, listingId: data.listingId, salePrice: data.salePrice },
-    });
-    await this.notifications.create({
-      userUid: uid,
-      title: 'Transaction created',
-      message: `New transaction for $${data.salePrice}`,
-      level: 'success',
-      metadata: { transactionId: id },
-    });
+    try {
+      await this.activity.write({
+        entityType: 'transaction',
+        entityId: id,
+        action: 'created',
+        message: `Transaction created: Sale Price $${data.salePrice}`,
+        metadata: { propertyId: data.propertyId, listingId: data.listingId, salePrice: data.salePrice },
+      });
+      await this.notifications.create({
+        userUid: uid,
+        title: 'Transaction created',
+        message: `New transaction for $${data.salePrice}`,
+        level: 'success',
+        metadata: { transactionId: id },
+      });
+    } catch (err) {
+      console.error('Transaction created, but activity log/notification failed', err);
+    }
     return id;
   }
 
@@ -117,24 +129,49 @@ export class TransactionsService {
     const orgId = this.org.requireOrgId();
     const uid = this.requireUid();
     const current = await this.getSnapshot(transactionId);
-    if (patch.status && patch.status !== current.status) {
+    const statusChanging = !!patch.status && patch.status !== current.status;
+    if (statusChanging) {
       const allowed = TRANSACTION_TRANSITIONS[current.status] ?? [];
-      if (!allowed.includes(patch.status)) {
+      if (!allowed.includes(patch.status!)) {
         throw new Error(`Invalid transaction status transition: ${current.status} -> ${patch.status}`);
       }
-      await this.activity.write({
-        entityType: 'transaction',
-        entityId: transactionId,
-        action: 'statusChanged',
-        message: `Transaction status changed: ${current.status} → ${patch.status}`,
-        metadata: { fromStatus: current.status, toStatus: patch.status },
-      });
+      try {
+        await this.activity.write({
+          entityType: 'transaction',
+          entityId: transactionId,
+          action: 'statusChanged',
+          message: `Transaction status changed: ${current.status} → ${patch.status}`,
+          metadata: { fromStatus: current.status, toStatus: patch.status },
+        });
+      } catch (err) {
+        console.error('Failed to log transaction status change', err);
+      }
     }
     await updateDoc(doc(this.fs, `orgs/${orgId}/transactions/${transactionId}`), stripUndefined({
       ...patch,
       updatedAt: Date.now(),
       updatedBy: uid,
     } as any) as any);
+
+    if (statusChanging && patch.status === 'closed') {
+      try {
+        const grossCommission = current.salePrice && current.commissionRate
+          ? Number(current.salePrice) * (Number(current.commissionRate) / 100)
+          : undefined;
+        await this.commissions.create({
+          transactionId,
+          agentId: current.agentId,
+          salePrice: current.salePrice,
+          commissionRate: current.commissionRate,
+          grossCommission,
+          netCommission: grossCommission,
+          closingDate: current.closingDate,
+          agencyId: current.agencyId,
+        });
+      } catch (err) {
+        console.error('Failed to auto-create commission from closed transaction', err);
+      }
+    }
   }
 
   private async getSnapshot(transactionId: string): Promise<TransactionRecord> {

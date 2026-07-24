@@ -24,6 +24,8 @@ import { Property } from '../../core/models/property.models';
         <input class="input" placeholder="Search by name/address..." [(ngModel)]="q" />
       </div>
 
+      <div class="delete-error" *ngIf="deleteError">{{ deleteError }}</div>
+
       <div class="list" *ngIf="(props$ | async) as props">
         <div class="row" *ngFor="let p of filter(props)">
           <div>
@@ -61,6 +63,7 @@ import { Property } from '../../core/models/property.models';
     .h1{ font-size:20px; font-weight:900; color:#e5e7eb; }
     .muted{ color: rgba(226,232,240,.75); font-size:12px; margin-top:4px; }
     .filters{ margin-top:12px; }
+    .delete-error{ margin-top:10px; padding:10px 12px; border-radius:12px; background: rgba(239,68,68,.14); border:1px solid rgba(239,68,68,.35); color:#fecaca; font-size:13px; }
     .input{ width:100%; max-width:520px; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background: rgba(2,6,23,.25); color:#e5e7eb; outline:none; }
     .btn{ padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.10); background: rgba(59,130,246,.85); color:white; font-weight:800; cursor:pointer; }
     .list{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
@@ -83,6 +86,7 @@ export class PropertiesListPage {
   q = '';
   props$: Observable<Property[]> = this.svc.list();
   activeDropdown: string | null = null;
+  deleteError = '';
 
   filter(list: Property[]) {
     const q = (this.q || '').trim().toLowerCase();
@@ -107,8 +111,12 @@ export class PropertiesListPage {
   }
 
   async delete(id: string) {
-    if (confirm('Are you sure you want to delete this property?')) {
+    if (!confirm('Are you sure you want to delete this property?')) return;
+    this.deleteError = '';
+    try {
       await this.svc.delete(id);
+    } catch (err: any) {
+      this.deleteError = err?.message || 'Failed to delete property.';
     }
   }
 }

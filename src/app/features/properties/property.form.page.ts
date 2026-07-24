@@ -120,7 +120,7 @@ import { Property } from '../../core/models/property.models';
       <div class="section-title">
         Multi-Unit Configuration
         <label class="checkbox-container">
-          <input type="checkbox" [(ngModel)]="hasMultipleUnits" (change)="onMultiUnitToggle()" />
+          <input type="checkbox" [(ngModel)]="hasMultipleUnits" />
           <span>This property has multiple units/apartments</span>
         </label>
       </div>
@@ -157,89 +157,8 @@ import { Property } from '../../core/models/property.models';
         </div>
       </div>
 
-      <div *ngIf="hasMultipleUnits">
-        <!-- Multiple Units Management -->
-        <div class="units-header">
-          <span>Units/Apartments ({{ units.length }})</span>
-          <button class="btn-small" type="button" (click)="addUnit()">+ Add Unit</button>
-        </div>
-
-        <div class="units-list" *ngIf="units.length > 0">
-          <div class="unit-card" *ngFor="let unit of units; let i = index">
-            <div class="unit-header">
-              <span class="unit-title">Unit {{ i + 1 }}</span>
-              <button class="btn-remove" type="button" (click)="removeUnit(i)">✕</button>
-            </div>
-
-            <div class="grid2">
-              <div>
-                <label class="lbl-small">Unit/Apt Number*</label>
-                <input class="input-small" [(ngModel)]="unit.unitNumber" placeholder="e.g., 101, A1" />
-              </div>
-              <div>
-                <label class="lbl-small">Floor</label>
-                <input class="input-small" type="number" [(ngModel)]="unit.floor" placeholder="Floor" />
-              </div>
-            </div>
-
-            <div class="grid3">
-              <div>
-                <label class="lbl-small">Bedrooms</label>
-                <input class="input-small" type="number" [(ngModel)]="unit.bedrooms" placeholder="0" />
-              </div>
-              <div>
-                <label class="lbl-small">Bathrooms</label>
-                <input class="input-small" type="number" [(ngModel)]="unit.bathrooms" placeholder="0" />
-              </div>
-              <div>
-                <label class="lbl-small">Square Feet</label>
-                <input class="input-small" type="number" [(ngModel)]="unit.squareFeet" placeholder="sq ft" />
-              </div>
-            </div>
-
-            <div class="grid3">
-              <div>
-                <label class="lbl-small">Monthly Rent</label>
-                <input class="input-small" type="number" [(ngModel)]="unit.monthlyRent" placeholder="$" />
-              </div>
-              <div>
-                <label class="lbl-small">Security Deposit</label>
-                <input class="input-small" type="number" [(ngModel)]="unit.securityDeposit" placeholder="$" />
-              </div>
-
-              <div>
-                <label class="lbl-small">Status</label>
-                <select class="input-small" [(ngModel)]="unit.status">
-                  <option value="available">Available</option>
-                  <option value="occupied">Occupied</option>
-                  <option value="maintenance">Maintenance</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="grid2">
-              <div>
-                <label class="lbl-small">Furnished</label>
-                <select class="input-small" [(ngModel)]="unit.furnished">
-                  <option [ngValue]="false">No</option>
-                  <option [ngValue]="true">Yes</option>
-                </select>
-              </div>
-              <div>
-                <label class="lbl-small">Type</label>
-                <select class="input-small" [(ngModel)]="unit.unitType">
-                  <option value="studio">Studio</option>
-                  <option value="apartment">Apartment</option>
-                  <option value="penthouse">Penthouse</option>
-                  <option value="loft">Loft</option>
-                </select>
-              </div>
-            </div>
-
-            <label class="lbl-small">Notes</label>
-            <textarea class="input-small textarea" [(ngModel)]="unit.notes" placeholder="Additional unit details..."></textarea>
-          </div>
-        </div>
+      <div class="units-header" *ngIf="hasMultipleUnits">
+        <span>This property has multiple units. Add and manage individual units, rent, and occupancy from the Units page after saving.</span>
       </div>
 
       <!-- Additional Information -->
@@ -274,17 +193,8 @@ import { Property } from '../../core/models/property.models';
     .textarea{min-height:100px;resize:vertical;font-family:inherit;line-height:1.5}
     .checkbox-container{display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;color:#475569;font-size:14px}
     .checkbox-container input[type="checkbox"]{width:18px;height:18px;cursor:pointer;accent-color:#3b82f6}
-    .units-header{display:flex;justify-content:space-between;align-items:center;margin-top:16px;margin-bottom:16px;padding:14px 18px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe}
-    .units-header span{font-size:15px;font-weight:700;color:#1e40af}
-    .btn-small{padding:8px 16px;border-radius:8px;border:none;background:#3b82f6;color:white;font-weight:700;cursor:pointer;font-size:13px;transition:all 0.2s ease}
-    .btn-small:hover{background:#2563eb;transform:translateY(-1px);box-shadow:0 4px 12px rgba(59,130,246,.3)}
-    .units-list{display:flex;flex-direction:column;gap:20px}
-    .unit-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:24px;transition:all 0.2s ease}
-    .unit-card:hover{border-color:#cbd5e1;box-shadow:0 4px 12px rgba(0,0,0,.06)}
-    .unit-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e2e8f0}
-    .unit-title{font-size:14px;font-weight:700;color:#334155}
-    .btn-remove{padding:4px 10px;border-radius:6px;border:none;background:#fee2e2;color:#dc2626;font-weight:700;cursor:pointer;font-size:16px;transition:all 0.2s ease}
-    .btn-remove:hover{background:#fecaca;transform:scale(1.05)}
+    .units-header{margin-top:16px;margin-bottom:16px;padding:14px 18px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe}
+    .units-header span{font-size:14px;font-weight:600;color:#1e40af}
     .actions{display:flex;justify-content:flex-end;align-items:center;margin-top:40px;padding-top:24px;gap:16px;flex-wrap:wrap;border-top:2px solid #e2e8f0}
     .btn{padding:14px 28px;border-radius:8px;border:none;background:#3b82f6;color:white;font-weight:700;cursor:pointer;font-size:15px;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(59,130,246,.2)}
     .btn:hover{background:#2563eb;transform:translateY(-2px);box-shadow:0 4px 16px rgba(59,130,246,.3)}
@@ -323,7 +233,6 @@ export class PropertyFormPage {
   monthlyRent: number | null = null;
   securityDeposit: number | null = null;
   furnished = false;
-  units: any[] = [];
   description = '';
   owner = '';
   manager = '';
@@ -357,7 +266,6 @@ export class PropertyFormPage {
         this.hasMultipleUnits = !!p?.hasMultipleUnits;
         this.bedrooms = (p?.bedrooms ?? null) as any;
         this.bathrooms = (p?.bathrooms ?? null) as any;
-        this.units = p?.units ? [...p.units] : [];
         this.description = p?.description ?? '';
         this.owner = p?.owner ?? '';
         this.manager = p?.manager ?? '';
@@ -365,32 +273,6 @@ export class PropertyFormPage {
         this.contactEmail = p?.contactEmail ?? '';
       });
     }
-  }
-
-  onMultiUnitToggle() {
-    if (!this.hasMultipleUnits) {
-      this.units = [];
-    }
-  }
-
-  addUnit() {
-    this.units.push({
-      unitNumber: '',
-      floor: null,
-      bedrooms: null,
-      bathrooms: null,
-      squareFeet: null,
-      monthlyRent: null,
-      securityDeposit: null,
-      status: 'available',
-      furnished: false,
-      unitType: 'apartment',
-      notes: ''
-    });
-  }
-
-  removeUnit(index: number) {
-    this.units.splice(index, 1);
   }
 
   async back() {
@@ -421,7 +303,6 @@ export class PropertyFormPage {
         monthlyRent: this.monthlyRent ?? undefined,
         securityDeposit: this.securityDeposit ?? undefined,
         furnished: !!this.furnished,
-        units: this.units.length > 0 ? this.units : undefined,
         description: (this.description || '').trim() || undefined,
         owner: (this.owner || '').trim() || undefined,
         manager: (this.manager || '').trim() || undefined,

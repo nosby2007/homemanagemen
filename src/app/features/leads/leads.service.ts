@@ -21,7 +21,7 @@ import { OrgContextService } from '../../core/org/org-context.service';
 import { ActivityLogService } from '../../core/services/activity-log.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { LEAD_TRANSITIONS } from '../../core/auth/rbac';
-import { LeadRecord, LeadStatus } from '../../core/models/real-estate.models';
+import { ClientRecord, LeadRecord, LeadStatus } from '../../core/models/real-estate.models';
 import { stripUndefined } from '../../core/utils/firestore-clean';
 
 @Injectable({ providedIn: 'root' })
@@ -94,20 +94,24 @@ export class LeadsService {
     };
 
     await setDoc(doc(this.fs, `orgs/${orgId}/leads/${id}`), stripUndefined(data) as any);
-    await this.activity.write({
-      entityType: 'lead',
-      entityId: id,
-      action: 'created',
-      message: `Lead created: ${data.fullName}`,
-      metadata: { source: data.source, interestType: data.interestType },
-    });
-    await this.notifications.create({
-      userUid: uid,
-      title: 'Lead created',
-      message: `${data.fullName} added to your pipeline`,
-      level: 'success',
-      metadata: { leadId: id },
-    });
+    try {
+      await this.activity.write({
+        entityType: 'lead',
+        entityId: id,
+        action: 'created',
+        message: `Lead created: ${data.fullName}`,
+        metadata: { source: data.source, interestType: data.interestType },
+      });
+      await this.notifications.create({
+        userUid: uid,
+        title: 'Lead created',
+        message: `${data.fullName} added to your pipeline`,
+        level: 'success',
+        metadata: { leadId: id },
+      });
+    } catch (err) {
+      console.error('Lead created, but activity log/notification failed', err);
+    }
     return id;
   }
 
@@ -115,24 +119,65 @@ export class LeadsService {
     const orgId = this.org.requireOrgId();
     const uid = this.requireUid();
     const current = await this.getSnapshot(leadId);
-    if (patch.status && patch.status !== current.status) {
+    const statusChanging = !!patch.status && patch.status !== current.status;
+    if (statusChanging) {
       const allowed = LEAD_TRANSITIONS[current.status] ?? [];
-      if (!allowed.includes(patch.status)) {
+      if (!allowed.includes(patch.status!)) {
         throw new Error(`Invalid lead status transition: ${current.status} -> ${patch.status}`);
       }
-      await this.activity.write({
-        entityType: 'lead',
-        entityId: leadId,
-        action: 'statusChanged',
-        message: `Lead status changed: ${current.status} → ${patch.status}`,
-        metadata: { fromStatus: current.status, toStatus: patch.status },
-      });
+      try {
+        await this.activity.write({
+          entityType: 'lead',
+          entityId: leadId,
+          action: 'statusChanged',
+          message: `Lead status changed: ${current.status} → ${patch.status}`,
+          metadata: { fromStatus: current.status, toStatus: patch.status },
+        });
+      } catch (err) {
+        console.error('Failed to log lead status change', err);
+      }
     }
     await updateDoc(doc(this.fs, `orgs/${orgId}/leads/${leadId}`), stripUndefined({
       ...patch,
       updatedAt: Date.now(),
       updatedBy: uid,
     } as any) as any);
+
+    if (statusChanging && patch.status === 'closed') {
+      try {
+        await this.convertToClient(current, uid);
+      } catch (err) {
+        console.error('Failed to auto-create client from converted lead', err);
+      }
+    }
+  }
+
+  private async convertToClient(lead: LeadRecord, uid: string) {
+    const orgId = this.org.requireOrgId();
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    const data: ClientRecord = {
+      id,
+      orgId,
+      fullName: lead.fullName,
+      clientType: lead.interestType === 'sell' ? 'seller' : 'buyer',
+      email: lead.email,
+      phone: lead.phone,
+      assignedAgentId: lead.assignedAgentId,
+      userId: null,
+      authStatus: 'not_invited',
+      budget: lead.budget,
+      preferredLocation: lead.preferredLocation,
+      notes: lead.notes,
+      propertyIds: [],
+      agencyId: lead.agencyId,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: uid,
+      updatedBy: uid,
+    };
+    await setDoc(doc(this.fs, `orgs/${orgId}/clients/${id}`), stripUndefined(data) as any);
   }
 
   private async getSnapshot(leadId: string): Promise<LeadRecord> {
